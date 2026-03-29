@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Conversations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+<style>
+/* ── Tokens: VNX sidebar + Claude content ──────────── */
+:root {
+  /* VNX brand — sidebar & toolbar */
+  --navy: #0A2463;
+  --navy-light: #0E2D7A;
+  --navy-dark: #061845;
+  --orange: #F97316;
+  --orange-light: #FB923C;
+
+  /* Claude-inspired — content areas */
+  --claude-bg: #1a1a2e;
+  --claude-surface: #1e1e32;
+  --claude-surface-hover: #252540;
+  --claude-border: rgba(255, 255, 255, 0.08);
+  --claude-user-bg: #2a2a42;
+  --claude-assistant-bg: rgba(217, 119, 87, 0.08);
+  --claude-assistant-border: rgba(217, 119, 87, 0.15);
+  --claude-terracotta: #D97757;
+  --claude-terracotta-light: #E8956F;
+
+  /* Text */
+  --text-bright: #ECECF1;
+  --text-muted: rgba(236, 236, 241, 0.6);
+  --text-dim: rgba(236, 236, 241, 0.35);
+  --accent: #E5F6FF;
+
+  /* Shared */
+  --card-bg: rgba(14, 45, 122, 0.5);
+  --card-border: rgba(229, 246, 255, 0.12);
+  --card-hover: rgba(14, 45, 122, 0.7);
+  --sidebar-w: 220px;
+  --radius: 8px;
+  --transition: 150ms ease;
+}
+
+/* ── Reset ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--claude-bg);
+  color: var(--text-bright);
+  overflow: hidden;
+  height: 100vh;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-rows: 52px 1fr 28px;
+  height: 100vh;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--navy);
+  border-bottom: 1px solid var(--card-border);
+  -webkit-app-region: drag;
+}
+
+.toolbar > * { -webkit-app-region: no-drag; }
+
+.search-wrapper {
+  flex: 1;
+  max-width: 500px;
+  position: relative;
+}
+
+.search-wrapper svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+}
+
+.search-input {
+  width: 100%;
+  background: var(--navy-dark);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 7px 12px 7px 32px;
+  color: var(--text-bright);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.search-input:focus { border-color: var(--orange); }
+.search-input::placeholder { color: var(--text-dim); }
+
+.toolbar-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-btn:hover { background: var(--card-hover); color: var(--text-bright); }
+.toolbar-btn.active { background: var(--orange); color: white; border-color: var(--orange); }
+
+.toolbar-logo {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--orange);
+  margin-right: 8px;
+  letter-spacing: -0.3px;
+}
+
+.main-panels {
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Resize Handles ─────────────────────────────────── */
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+  background: var(--claude-terracotta);
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -4px; right: -4px;
+}
+
+/* ── Sidebar (Projects) ─────────────────────────────── */
+.sidebar {
+  width: 220px;
+  min-width: 140px;
+  max-width: 400px;
+  background: var(--navy);
+  border-right: 1px solid var(--card-border);
+  overflow-y: auto;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 8px 14px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+.project-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background var(--transition);
+  border-left: 3px solid transparent;
+}
+
+.project-item:hover { background: var(--card-bg); }
+.project-item.active { background: var(--card-bg); border-left-color: var(--orange); }
+
+.project-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: rgba(255,255,255,0.06);
+  padding: 1px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.project-group { margin: 0; }
+
+.group-header {
+  gap: 4px;
+}
+
+.group-header .project-name {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.active-group { background: rgba(14, 45, 122, 0.3); }
+
+.project-expand {
+  font-size: 16px;
+  color: var(--text-muted);
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* ── Conversations Panel ────────────────────────────── */
+.conversations-panel {
+  width: 400px;
+  min-width: 250px;
+  max-width: 700px;
+  border-right: 1px solid var(--claude-border);
+  overflow-y: auto;
+  background: var(--claude-bg);
+  flex-shrink: 0;
+}
+
+.conversations-header {
+  position: sticky;
+  top: 0;
+  background: var(--claude-bg);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--claude-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+}
+
+.conversations-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.conv-item {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--claude-border);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.conv-item:hover { background: var(--claude-surface); }
+.conv-item.active { background: var(--claude-surface); border-left: 3px solid var(--claude-terracotta); }
+
+.conv-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 4px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.conv-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.conv-meta .dot { color: var(--text-dim); }
+
+.conv-excerpt {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.conv-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.btn-resume {
+  background: var(--claude-terracotta);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-resume:hover { background: var(--claude-terracotta-light); }
+
+.btn-resume-alt {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--claude-border);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-resume-alt:hover { background: var(--claude-surface); color: var(--text-bright); }
+
+/* ── Preview Panel ──────────────────────────────────── */
+.preview-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--claude-bg);
+  flex: 1;
+  min-width: 300px;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--claude-surface);
+  border-bottom: 1px solid var(--claude-border);
+  padding: 0 12px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.preview-header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.preview-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-scroll-bottom {
+  background: none;
+  border: 1px solid var(--claude-border);
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: all var(--transition);
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-scroll-bottom:hover {
+  background: var(--claude-surface-hover);
+  color: var(--text-bright);
+  border-color: var(--claude-terracotta);
+}
+
+/* ── File Browser Panel (4th column, collapsible) ───── */
+.file-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--claude-bg);
+  width: 0;
+  min-width: 0;
+  max-width: 600px;
+  flex-shrink: 0;
+  transition: width 0.2s ease, border 0.2s ease;
+  border-left: 0px solid var(--claude-border);
+}
+
+.file-panel.open {
+  width: 350px;
+  min-width: 200px;
+  border-left: 1px solid var(--claude-border);
+}
+
+.file-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--claude-surface);
+  border-bottom: 1px solid var(--claude-border);
+  padding: 0 12px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.file-panel-header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.file-panel-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.file-panel-close:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-bright);
+}
+
+.file-panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-panel-tree {
+  overflow-y: auto;
+  flex: 0 0 auto;
+  max-height: 50%;
+  border-bottom: 1px solid var(--claude-border);
+  padding: 4px 0;
+}
+
+.file-panel-preview {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+.btn-files-toggle {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-files-toggle:hover { background: var(--card-hover); color: var(--text-bright); }
+.btn-files-toggle.active { background: var(--claude-terracotta); color: white; border-color: var(--claude-terracotta); }
+
+.preview-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* ── Chat Preview ───────────────────────────────────── */
+.chat-messages { max-width: 700px; }
+
+.chat-msg {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.chat-msg.user {
+  background: var(--claude-user-bg);
+  border: 1px solid var(--claude-border);
+  margin-left: 40px;
+}
+
+.chat-msg.assistant {
+  background: var(--claude-assistant-bg);
+  border: 1px solid var(--claude-assistant-border);
+  margin-right: 40px;
+}
+
+.chat-msg-role {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.chat-msg.user .chat-msg-role { color: var(--accent); }
+.chat-msg.assistant .chat-msg-role { color: var(--claude-terracotta); }
+
+.chat-msg-content {
+  color: var(--text-bright);
+  word-break: break-word;
+}
+
+.chat-msg-content p { margin-bottom: 8px; }
+.chat-msg-content p:last-child { margin-bottom: 0; }
+.chat-msg-content pre { background: var(--claude-bg); padding: 10px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+.chat-msg-content code { font-size: 12px; }
+.chat-msg-content ul, .chat-msg-content ol { padding-left: 20px; margin-bottom: 8px; }
+
+.chat-msg-time {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+/* ── File Browser ───────────────────────────────────── */
+.file-browser {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+.file-tree {
+  overflow-y: auto;
+  border-right: 1px solid var(--claude-border);
+  padding: 8px 0;
+}
+
+.file-preview {
+  overflow: auto;
+  padding: 16px;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+
+.tree-item:hover { background: var(--claude-surface); color: var(--text-bright); }
+.tree-item.active { background: var(--claude-surface); color: var(--claude-terracotta); }
+
+.tree-item .icon { font-size: 14px; flex-shrink: 0; width: 18px; text-align: center; }
+.tree-item.dir .icon { color: var(--orange-light); }
+.tree-item.dir { font-weight: 500; }
+
+.tree-indent { display: inline-block; }
+
+.file-content-display {
+  background: var(--claude-surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow: auto;
+  max-height: 100%;
+}
+
+.file-content-display img {
+  max-width: 100%;
+  border-radius: var(--radius);
+}
+
+.file-content-display pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Markdown rendering */
+.markdown-render { color: var(--text-bright); line-height: 1.6; }
+.markdown-render h1, .markdown-render h2, .markdown-render h3 { color: var(--accent); margin: 16px 0 8px; }
+.markdown-render h1 { font-size: 20px; border-bottom: 1px solid var(--card-border); padding-bottom: 8px; }
+.markdown-render h2 { font-size: 17px; }
+.markdown-render h3 { font-size: 15px; }
+.markdown-render p { margin-bottom: 10px; }
+.markdown-render a { color: var(--claude-terracotta); text-decoration: none; }
+.markdown-render a:hover { text-decoration: underline; }
+.markdown-render code { background: var(--claude-bg); padding: 2px 5px; border-radius: 3px; font-size: 12px; }
+.markdown-render pre code { display: block; padding: 12px; border-radius: 6px; overflow-x: auto; }
+.markdown-render ul, .markdown-render ol { padding-left: 20px; margin-bottom: 10px; }
+.markdown-render blockquote { border-left: 3px solid var(--claude-terracotta); padding-left: 12px; color: var(--text-muted); margin: 10px 0; }
+.markdown-render table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+.markdown-render th, .markdown-render td { border: 1px solid var(--card-border); padding: 6px 10px; text-align: left; }
+.markdown-render th { background: var(--claude-surface); font-weight: 600; }
+.markdown-render img { max-width: 100%; border-radius: 6px; }
+
+/* ── Statusbar ──────────────────────────────────────── */
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: var(--navy);
+  border-top: 1px solid var(--card-border);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.statusbar-left, .statusbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Empty States ───────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 40px;
+}
+
+.empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
+.empty-state .title { font-size: 15px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+.empty-state .desc { font-size: 12px; max-width: 280px; line-height: 1.5; }
+
+/* ── Scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(229, 246, 255, 0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(229, 246, 255, 0.25); }
+
+/* ── Loading ────────────────────────────────────────── */
+.spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--card-border);
+  border-top-color: var(--orange);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toast ──────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 40px;
+  right: 20px;
+  background: #dc2626;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  z-index: 9999;
+  animation: toastIn 0.3s ease, toastOut 0.3s ease 3s forwards;
+  max-width: 400px;
+}
+.toast.success { background: #16a34a; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <span class="toolbar-logo">Claude Conversations</span>
+    <div class="search-wrapper">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search conversations..." />
+    </div>
+    <select class="toolbar-btn" id="sortSelect">
+      <option value="date">Most recent</option>
+      <option value="messages">Most messages</option>
+      <option value="tokens">Most tokens</option>
+      <option value="title">Title A-Z</option>
+    </select>
+    <button class="btn-files-toggle" id="filesToggleBtn" onclick="toggleFilePanel()" title="Toggle file browser">&#128193; Files</button>
+    <button class="toolbar-btn" id="reindexBtn" title="Re-index conversations">&#8635; Index</button>
+  </div>
+
+  <!-- Main Panels -->
+  <div class="main-panels">
+    <!-- Sidebar: Projects -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">Projects</div>
+      <div id="projectList"></div>
+    </div>
+    <div class="resize-handle" data-resize="sidebar"></div>
+
+    <!-- Middle: Conversations -->
+    <div class="conversations-panel" id="conversationsPanel">
+      <div class="conversations-header">
+        <span class="conversations-title" id="convTitle">All conversations</span>
+        <span style="font-size:11px;color:var(--text-dim)" id="convCount"></span>
+      </div>
+      <div id="convList"></div>
+    </div>
+
+    <div class="resize-handle" data-resize="conversations"></div>
+    <!-- Chat Preview -->
+    <div class="preview-panel">
+      <div class="preview-header">
+        <span class="preview-header-title">Chat Preview</span>
+        <div class="preview-header-actions">
+          <button class="btn-scroll-bottom" onclick="scrollToBottom()" title="Scroll naar einde">&#8595; Einde</button>
+        </div>
+      </div>
+      <div class="preview-content" id="previewContent">
+        <div class="empty-state">
+          <div class="icon">&#128172;</div>
+          <div class="title">Select a conversation</div>
+          <div class="desc">Click a conversation to preview messages, or use the search bar.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Browser (4th panel, collapsible) -->
+    <div class="resize-handle" data-resize="filePanel" id="filePanelResize" style="display:none"></div>
+    <div class="file-panel" id="filePanel">
+      <div class="file-panel-header">
+        <span class="file-panel-header-title">Files</span>
+        <button class="file-panel-close" onclick="toggleFilePanel()" title="Close file browser">&times;</button>
+      </div>
+      <div class="file-panel-content">
+        <div class="file-panel-tree" id="filePanelTree"></div>
+        <div class="file-panel-preview" id="filePanelPreview">
+          <div class="empty-state"><div class="icon">&#128196;</div><div class="title">Select a file</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statusbar -->
+  <div class="statusbar">
+    <div class="statusbar-left">
+      <span id="statusTotal">Loading...</span>
+    </div>
+    <div class="statusbar-right">
+      <span id="statusIndexed"></span>
+      <span>Claude Conversations</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────
+let state = {
+  projects: [],
+  conversations: [],
+  selectedProject: 'all',
+  selectedConv: null,
+  currentTab: 'chat',
+  searchQuery: '',
+  sort: 'date',
+  fileTree: null,
+};
+
+// ── Init ──────────────────────────────────────────────
+async function init() {
+  await loadProjects();
+  await loadConversations();
+  await loadStats();
+}
+
+// Wait for pywebview API to be ready
+window.addEventListener('pywebviewready', init);
+
+// ── API Helpers ───────────────────────────────────────
+async function api(method, ...args) {
+  return await window.pywebview.api[method](...args);
+}
+
+// ── Projects ──────────────────────────────────────────
+async function loadProjects() {
+  state.projects = await api('get_projects');
+  renderProjects();
+}
+
+function buildProjectTree(projects) {
+  // Build a nested tree from flat project paths like "Content/blog", "Content/linkedin"
+  const tree = { children: {}, items: [], count: 0 };
+
+  for (const p of projects) {
+    if (p.project_path === 'root') {
+      tree.items.push(p);
+      tree.count += p.count;
+      continue;
+    }
+    const parts = p.project_path.split('/');
+    let node = tree;
+    for (let i = 0; i < parts.length; i++) {
+      const key = parts[i];
+      if (!node.children[key]) {
+        node.children[key] = { children: {}, items: [], count: 0, path: parts.slice(0, i + 1).join('/') };
+      }
+      node.children[key].count += p.count;
+      node = node.children[key];
+    }
+    node.items.push(p);
+    tree.count += p.count;
+  }
+  return tree;
+}
+
+function renderProjects() {
+  const el = document.getElementById('projectList');
+  const tree = buildProjectTree(state.projects);
+
+  let html = `<div class="project-item ${state.selectedProject === 'all' ? 'active' : ''}" onclick="selectProject('all')">
+    <span class="project-name">All projects</span>
+    <span class="project-count">${tree.count}</span>
+  </div>`;
+
+  // Render root-level items
+  for (const p of tree.items) {
+    const rootName = p.project_path.split('/').pop() || p.project_path;
+    html += renderProjectItem(p, rootName, 0);
+  }
+
+  // Render children as collapsible groups
+  html += renderProjectNode(tree, 0);
+
+  el.innerHTML = html;
+}
+
+function renderProjectNode(node, depth) {
+  let html = '';
+  const sortedKeys = Object.keys(node.children).sort();
+
+  for (const key of sortedKeys) {
+    const child = node.children[key];
+    const hasSubfolders = Object.keys(child.children).length > 0;
+    const indent = depth * 12;
+    const isExpanded = state.expandedProjects && state.expandedProjects.has(child.path);
+
+    if (hasSubfolders) {
+      // Folder with subfolders — collapsible group header
+      const isSelectedGroup = state.selectedProject?.startsWith(child.path);
+      html += `<div class="project-group" style="padding-left:${indent}px">
+        <div class="project-item group-header ${isSelectedGroup ? 'active-group' : ''}" onclick="toggleProjectGroup('${child.path}')">
+          <span class="project-expand">${isExpanded ? '&#9662;' : '&#9656;'}</span>
+          <span class="project-name">${escHtml(key)}</span>
+          <span class="project-count">${child.count}</span>
+        </div>`;
+
+      if (isExpanded) {
+        // Render direct items of this folder
+        for (const p of child.items) {
+          const leafName = p.project_path.split('/').pop();
+          html += renderProjectItem(p, leafName, depth + 1);
+        }
+        // Render sub-children
+        html += renderProjectNode(child, depth + 1);
+      }
+      html += '</div>';
+    } else {
+      // Leaf folder — direct clickable
+      for (const p of child.items) {
+        const leafName = p.project_path.split('/').pop();
+        html += renderProjectItem(p, leafName, depth);
+      }
+    }
+  }
+  return html;
+}
+
+function renderProjectItem(p, displayName, depth) {
+  const indent = depth * 12;
+  return `<div class="project-item ${state.selectedProject === p.project_path ? 'active' : ''}"
+               style="padding-left:${14 + indent}px"
+               onclick="selectProject('${p.project_path}')">
+    <span class="project-name">${escHtml(displayName)}</span>
+    <span class="project-count">${p.count}</span>
+  </div>`;
+}
+
+function toggleProjectGroup(path) {
+  if (!state.expandedProjects) state.expandedProjects = new Set();
+  if (state.expandedProjects.has(path)) {
+    state.expandedProjects.delete(path);
+  } else {
+    state.expandedProjects.add(path);
+  }
+  renderProjects();
+}
+
+async function selectProject(path) {
+  state.selectedProject = path;
+  renderProjects();
+  await loadConversations();
+}
+
+// ── Conversations ─────────────────────────────────────
+async function loadConversations() {
+  const project = state.selectedProject === 'all' ? null : state.selectedProject;
+  state.conversations = await api('get_conversations', project, state.searchQuery || null, state.sort, 200, 0);
+  renderConversations();
+}
+
+function renderConversations() {
+  const el = document.getElementById('convList');
+  const titleEl = document.getElementById('convTitle');
+  const countEl = document.getElementById('convCount');
+
+  const name = state.selectedProject === 'all' ? 'All conversations' :
+    (state.selectedProject === 'root' ? 'BUSINESS (root)' : state.selectedProject);
+  titleEl.textContent = name;
+  countEl.textContent = `${state.conversations.length} results`;
+
+  if (!state.conversations.length) {
+    el.innerHTML = `<div class="empty-state" style="padding-top:60px">
+      <div class="icon">&#128269;</div>
+      <div class="title">No conversations found</div>
+      <div class="desc">${state.searchQuery ? 'Try different search terms.' : 'No data for this project.'}</div>
+    </div>`;
+    return;
+  }
+
+  let html = '';
+  for (const c of state.conversations) {
+    const date = formatDate(c.last_message);
+    const isActive = state.selectedConv === c.session_id;
+    const excerpt = (c.excerpt || '').split('---')[0].trim();
+    const tokens = c.total_tokens ? formatTokens(c.total_tokens) : '';
+
+    html += `<div class="conv-item ${isActive ? 'active' : ''}" onclick="selectConv('${c.session_id}')">
+      <div class="conv-title">${escHtml(c.title || '(untitled)')}</div>
+      <div class="conv-meta">
+        <span>${date}</span>
+        <span class="dot">&middot;</span>
+        <span>${c.message_count} msgs</span>
+        ${tokens ? `<span class="dot">&middot;</span><span>${tokens}</span>` : ''}
+        ${c.project_path !== 'root' ? `<span class="dot">&middot;</span><span>${escHtml(c.project_path)}</span>` : ''}
+      </div>
+      <div class="conv-excerpt">${escHtml(excerpt)}</div>
+      <div class="conv-actions">
+        <button class="btn-resume" onclick="event.stopPropagation(); openInTerminal('${c.session_id}', '${escAttr(c.cwd)}')">
+          &#9654; Resume
+        </button>
+        <button class="btn-resume-alt" onclick="event.stopPropagation(); exportConv('${c.session_id}', 'markdown')">
+          Export
+        </button>
+      </div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+async function selectConv(sessionId) {
+  state.selectedConv = sessionId;
+  renderConversations();
+  await loadChatPreview(sessionId);
+}
+
+// ── Chat Preview ──────────────────────────────────────
+async function loadChatPreview(sessionId) {
+  const el = document.getElementById('previewContent');
+  el.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+
+  const messages = await api('get_conversation_messages', sessionId);
+  if (!messages || !messages.length) {
+    el.innerHTML = '<div class="empty-state"><div class="title">No messages</div></div>';
+    return;
+  }
+
+  let html = '<div class="chat-messages">';
+  for (const m of messages) {
+    if (!m.content || m.content.length < 2) continue;
+    const rendered = m.role === 'assistant' ? renderMarkdown(m.content) : escHtml(m.content);
+    const time = m.timestamp ? formatTime(m.timestamp) : '';
+
+    html += `<div class="chat-msg ${m.role}">
+      <div class="chat-msg-role">${m.role === 'user' ? 'Jij' : 'Claude'}</div>
+      <div class="chat-msg-content">${rendered}</div>
+      ${time ? `<div class="chat-msg-time">${time}</div>` : ''}
+    </div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+
+  // Apply syntax highlighting
+  el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+}
+
+// ── File Browser ──────────────────────────────────────
+
+function renderTreeNode(node, depth) {
+  if (!node) return '';
+  let html = '';
+  const indent = depth * 16;
+
+  if (node.type === 'directory') {
+    html += `<div class="tree-item dir" style="padding-left:${8 + indent}px" onclick="toggleDir(this)">
+      <span class="icon">&#128193;</span>
+      <span>${escHtml(node.name)}</span>
+    </div>`;
+    if (node.children) {
+      html += `<div class="tree-children" style="display:none">`;
+      for (const child of node.children) {
+        html += renderTreeNode(child, depth + 1);
+      }
+      html += '</div>';
+    }
+  } else {
+    const icon = getFileIcon(node.extension);
+    html += `<div class="tree-item" style="padding-left:${8 + indent}px" onclick="previewFile('${escAttr(node.path)}')">
+      <span class="icon">${icon}</span>
+      <span>${escHtml(node.name)}</span>
+    </div>`;
+  }
+  return html;
+}
+
+function toggleDir(el) {
+  const children = el.nextElementSibling;
+  if (children && children.classList.contains('tree-children')) {
+    children.style.display = children.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+async function previewFile(filePath) {
+  const el = document.getElementById('filePanelPreview');
+  el.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+
+  // Remove active from all tree items, add to clicked
+  document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('active'));
+  event.currentTarget?.classList.add('active');
+
+  const result = await api('read_file', filePath);
+
+  if (result.type === 'error') {
+    el.innerHTML = `<div class="empty-state"><div class="title">Kan niet openen</div><div class="desc">${escHtml(result.content)}</div></div>`;
+    return;
+  }
+
+  if (result.type === 'image') {
+    el.innerHTML = `<div class="file-content-display"><img src="${result.content}" /></div>`;
+    return;
+  }
+
+  if (result.type === 'svg') {
+    el.innerHTML = `<div class="file-content-display">${result.content}</div>`;
+    return;
+  }
+
+  if (result.type === 'text') {
+    if (result.extension === '.md') {
+      // Render markdown
+      el.innerHTML = `<div class="file-content-display markdown-render">${renderMarkdown(result.content)}</div>`;
+    } else if (result.extension === '.html' || result.extension === '.htm') {
+      // Show HTML source + rendered preview
+      const highlighted = hljs.highlight(result.content, { language: 'html' }).value;
+      el.innerHTML = `<div class="file-content-display"><pre><code class="hljs">${highlighted}</code></pre></div>`;
+    } else {
+      const lang = result.language || 'plaintext';
+      let highlighted;
+      try {
+        highlighted = hljs.highlight(result.content, { language: lang }).value;
+      } catch {
+        highlighted = escHtml(result.content);
+      }
+      el.innerHTML = `<div class="file-content-display"><pre><code class="hljs">${highlighted}</code></pre></div>`;
+    }
+    return;
+  }
+
+  el.innerHTML = `<div class="file-content-display"><pre>${escHtml(result.content || 'Empty file')}</pre></div>`;
+}
+
+function getFileIcon(ext) {
+  const icons = {
+    '.md': '&#128221;', '.py': '&#128013;', '.js': '&#9889;', '.ts': '&#128310;',
+    '.json': '&#123;&#125;', '.html': '&#127760;', '.css': '&#127912;',
+    '.sql': '&#128450;', '.yaml': '&#9881;', '.yml': '&#9881;',
+    '.sh': '&#128187;', '.png': '&#128248;', '.jpg': '&#128248;',
+    '.jpeg': '&#128248;', '.svg': '&#128248;', '.gif': '&#128248;',
+    '.txt': '&#128196;', '.env': '&#128274;',
+  };
+  return icons[ext] || '&#128196;';
+}
+
+// ── Scroll to bottom ──────────────────────────────────
+function scrollToBottom() {
+  const el = document.getElementById('previewContent');
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+}
+
+// ── File Panel Toggle ─────────────────────────────────
+async function toggleFilePanel() {
+  const panel = document.getElementById('filePanel');
+  const btn = document.getElementById('filesToggleBtn');
+  const isOpen = panel.classList.contains('open');
+
+  const resizeHandle = document.getElementById('filePanelResize');
+  if (isOpen) {
+    panel.classList.remove('open');
+    btn.classList.remove('active');
+    resizeHandle.style.display = 'none';
+  } else {
+    panel.classList.add('open');
+    btn.classList.add('active');
+    resizeHandle.style.display = 'block';
+    if (!state.fileTree) {
+      state.fileTree = await api('get_file_tree');
+    }
+    document.getElementById('filePanelTree').innerHTML = renderTreeNode(state.fileTree, 0);
+  }
+}
+
+// ── Terminal ──────────────────────────────────────────
+async function openInTerminal(sessionId, cwd) {
+  const result = await api('open_in_terminal', sessionId, cwd);
+  if (result.ok) {
+    showToast('Opened in terminal', 'success');
+  } else {
+    showToast(`Error: ${result.error}`, 'error');
+  }
+}
+
+// ── Export ────────────────────────────────────────────
+async function exportConv(sessionId, format) {
+  const result = await api('export_conversation', sessionId, format || 'markdown');
+  if (result.ok) {
+    // Copy to clipboard
+    navigator.clipboard.writeText(result.content).then(() => {
+      showToast(`Exported as ${format} — copied to clipboard`, 'success');
+    }).catch(() => {
+      // Fallback: download as file
+      const blob = new Blob([result.content], {type: 'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = result.filename; a.click();
+      URL.revokeObjectURL(url);
+      showToast(`Exported as ${result.filename}`, 'success');
+    });
+  } else {
+    showToast(`Export failed: ${result.error}`, 'error');
+  }
+}
+
+function showToast(message, type = 'error') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
+// ── Stats ─────────────────────────────────────────────
+async function loadStats() {
+  const stats = await api('get_stats');
+  document.getElementById('statusTotal').textContent =
+    `${stats.total_conversations} conversations \u00b7 ${stats.total_messages} messages \u00b7 ${formatTokens(stats.total_tokens)} tokens`;
+  document.getElementById('statusIndexed').textContent =
+    `Indexed: ${stats.last_indexed} \u00b7 ${stats.db_size_mb} MB`;
+}
+
+// ── Search ────────────────────────────────────────────
+let searchTimeout;
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    state.searchQuery = e.target.value.trim();
+    loadConversations();
+  }, 300);
+});
+
+document.getElementById('sortSelect').addEventListener('change', (e) => {
+  state.sort = e.target.value;
+  loadConversations();
+});
+
+document.getElementById('reindexBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('reindexBtn');
+  btn.textContent = 'Indexing...';
+  btn.disabled = true;
+  await api('reindex');
+  await loadProjects();
+  await loadConversations();
+  await loadStats();
+  btn.textContent = '\u21bb Index';
+  btn.disabled = false;
+});
+
+// ── Keyboard shortcuts ────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  // Cmd+F → focus search
+  if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
+  // Escape → clear search
+  if (e.key === 'Escape') {
+    document.getElementById('searchInput').value = '';
+    state.searchQuery = '';
+    loadConversations();
+  }
+});
+
+// ── Helpers ───────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escAttr(str) {
+  if (!str) return '';
+  return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+function renderMarkdown(text) {
+  if (!text) return '';
+  try {
+    return marked.parse(text);
+  } catch {
+    return escHtml(text);
+  }
+}
+
+function formatDate(ts) {
+  if (!ts) return '?';
+  const d = new Date(ts);
+  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function formatTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+function formatTokens(n) {
+  if (!n) return '0';
+  if (n >= 1e9) return `${(n/1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `${(n/1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `${(n/1e3).toFixed(0)}K`;
+  return n.toString();
+}
+
+// ── Resizable Columns ─────────────────────────────────
+(function() {
+  const handles = document.querySelectorAll('.resize-handle');
+  let activeHandle = null;
+  let startX = 0;
+  let startWidth = 0;
+  let targetEl = null;
+
+  handles.forEach(handle => {
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      activeHandle = handle;
+      activeHandle.classList.add('active');
+      startX = e.clientX;
+
+      const target = handle.dataset.resize;
+      if (target === 'sidebar') {
+        targetEl = document.getElementById('sidebar');
+      } else if (target === 'conversations') {
+        targetEl = document.getElementById('conversationsPanel');
+      } else if (target === 'filePanel') {
+        targetEl = document.getElementById('filePanel');
+      }
+      startWidth = targetEl.offsetWidth;
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!activeHandle || !targetEl) return;
+    const dx = e.clientX - startX;
+    const isRightPanel = activeHandle.dataset.resize === 'filePanel';
+    const delta = isRightPanel ? -dx : dx;  // Right panel: drag left = wider
+    const newWidth = Math.max(
+      parseInt(getComputedStyle(targetEl).minWidth) || 140,
+      Math.min(startWidth + delta, parseInt(getComputedStyle(targetEl).maxWidth) || 700)
+    );
+    targetEl.style.width = newWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (activeHandle) {
+      activeHandle.classList.remove('active');
+      activeHandle = null;
+      targetEl = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  });
+})();
+</script>
+</body>
+</html>
