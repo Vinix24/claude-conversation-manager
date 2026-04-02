@@ -9,8 +9,23 @@ description = "Local-first dashboard for browsing, searching, and understanding 
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+keywords = ["claude", "claude-code", "dashboard", "sessions", "local-first", "analytics"]
 authors = [
   { name = "Vincent van Deth" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: MacOS X",
+  "Environment :: X11 Applications",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
   "pywebview>=5.0",
@@ -20,6 +35,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/Vinix24/claude-conversation-manager"
 Repository = "https://github.com/Vinix24/claude-conversation-manager"
+Issues = "https://github.com/Vinix24/claude-conversation-manager/issues"
 
 [project.scripts]
 claude-session-dashboard = "app:main"

@@ -26,7 +26,23 @@ Claude Code stores session history as JSONL files in `~/.claude/projects/`. This
 
 ## Quick start
 
-### Option 1: plug-and-play install
+### Option 1: package install (recommended)
+
+```bash
+uv tool install claude-session-dashboard
+claude-session-dashboard-init
+claude-session-dashboard
+```
+
+or:
+
+```bash
+pipx install claude-session-dashboard
+claude-session-dashboard-init
+claude-session-dashboard
+```
+
+### Option 2: plug-and-play install (repo)
 
 ```bash
 git clone https://github.com/Vinix24/claude-conversation-manager.git
@@ -44,26 +60,6 @@ cd claude-conversation-manager
 5. On macOS, install a `launchd` job that reindexes every 30 minutes and on file changes
 
 If `~/.claude/projects/` does not exist yet, install still succeeds. The app opens with an empty state and you can reindex later after Claude Code has created local session files.
-
-### Option 2: package-style install
-
-If you prefer an isolated tool install, this repo is also ready for:
-
-```bash
-uv tool install .
-claude-session-dashboard-init
-claude-session-dashboard
-```
-
-or:
-
-```bash
-pipx install .
-claude-session-dashboard-init
-claude-session-dashboard
-```
-
-When this project is published to PyPI, the same commands will work without the trailing `.`.
 
 ## What the app includes
 
@@ -107,16 +103,16 @@ If the folder does not exist yet, the dashboard still launches. You will just se
 
 ## Running the app
 
-After installing:
-
-```bash
-./run.sh
-```
-
-If `~/.local/bin` is on your `PATH`, you can also run:
+After installing, you can run:
 
 ```bash
 claude-session-dashboard
+```
+
+If you installed via repo and prefer the script:
+
+```bash
+./run.sh
 ```
 
 Manual reindex:
