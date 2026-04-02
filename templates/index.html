@@ -1,1336 +1,2723 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claude Conversations</title>
+<title>Claude Code Session Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
 <style>
-/* ── Tokens: VNX sidebar + Claude content ──────────── */
 :root {
-  /* VNX brand — sidebar & toolbar */
   --navy: #0A2463;
-  --navy-light: #0E2D7A;
   --navy-dark: #061845;
   --orange: #F97316;
   --orange-light: #FB923C;
-
-  /* Claude-inspired — content areas */
-  --claude-bg: #1a1a2e;
-  --claude-surface: #1e1e32;
-  --claude-surface-hover: #252540;
-  --claude-border: rgba(255, 255, 255, 0.08);
-  --claude-user-bg: #2a2a42;
-  --claude-assistant-bg: rgba(217, 119, 87, 0.08);
-  --claude-assistant-border: rgba(217, 119, 87, 0.15);
-  --claude-terracotta: #D97757;
-  --claude-terracotta-light: #E8956F;
-
-  /* Text */
-  --text-bright: #ECECF1;
-  --text-muted: rgba(236, 236, 241, 0.6);
-  --text-dim: rgba(236, 236, 241, 0.35);
+  --terracotta: #D97757;
+  --terracotta-light: #E8956F;
   --accent: #E5F6FF;
-
-  /* Shared */
-  --card-bg: rgba(14, 45, 122, 0.5);
-  --card-border: rgba(229, 246, 255, 0.12);
-  --card-hover: rgba(14, 45, 122, 0.7);
-  --sidebar-w: 220px;
-  --radius: 8px;
-  --transition: 150ms ease;
+  --content-dark: #1a1a2e;
+  --surface-dark: #1e1e32;
+  --surface-deep: #151528;
+  --surface-soft: rgba(229, 246, 255, 0.05);
+  --surface-strong: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(217, 119, 87, 0.28);
+  --text-bright: #F3F5FA;
+  --text-muted: rgba(243, 245, 250, 0.72);
+  --text-dim: rgba(243, 245, 250, 0.42);
+  --danger: #ff6b6b;
+  --success: #4ade80;
+  --chart-blue: #8bd3ff;
+  --chart-orange: #F97316;
+  --chart-terracotta: #D97757;
+  --chart-gold: #f4b942;
+  --sidebar-width: 250px;
+  --list-width: 430px;
+  --file-width: 0px;
+  --handle-width: 6px;
+  --file-handle-width: 0px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --shadow-soft: 0 18px 48px rgba(5, 10, 30, 0.4);
+  --shadow-panel: 0 12px 30px rgba(6, 24, 69, 0.28);
+  --transition: 160ms ease;
 }
 
-/* ── Reset ──────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--claude-bg);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.16), transparent 34%),
+    radial-gradient(circle at 88% 0%, rgba(10, 36, 99, 0.55), transparent 28%),
+    linear-gradient(180deg, #111223 0%, #0f1324 100%);
   color: var(--text-bright);
   overflow: hidden;
-  height: 100vh;
-  font-size: 13px;
-  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Layout ─────────────────────────────────────────── */
+button,
+input,
+select {
+  font: inherit;
+}
+
 .app {
   display: grid;
-  grid-template-rows: 52px 1fr 28px;
+  grid-template-rows: 4px 64px 1fr 30px;
   height: 100vh;
+}
+
+.accent-bar {
+  background: linear-gradient(90deg, var(--terracotta), var(--orange), var(--navy));
 }
 
 .toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 16px;
-  background: var(--navy);
-  border-bottom: 1px solid var(--card-border);
+  padding: 0 18px;
+  background: rgba(10, 36, 99, 0.92);
+  border-bottom: 1px solid rgba(229, 246, 255, 0.14);
+  backdrop-filter: blur(18px);
   -webkit-app-region: drag;
 }
 
-.toolbar > * { -webkit-app-region: no-drag; }
-
-.search-wrapper {
-  flex: 1;
-  max-width: 500px;
-  position: relative;
+.toolbar > * {
+  -webkit-app-region: no-drag;
 }
 
-.search-wrapper svg {
+.toolbar-brand {
+  min-width: 220px;
+}
+
+.toolbar-title {
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.toolbar-subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.search-shell {
+  position: relative;
+  flex: 1;
+  max-width: 540px;
+}
+
+.search-shell svg {
   position: absolute;
-  left: 10px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   color: var(--text-dim);
 }
 
 .search-input {
   width: 100%;
-  background: var(--navy-dark);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  padding: 7px 12px 7px 32px;
+  border: 1px solid rgba(229, 246, 255, 0.16);
+  background: rgba(6, 24, 69, 0.55);
   color: var(--text-bright);
-  font-family: inherit;
-  font-size: 13px;
+  padding: 10px 14px 10px 36px;
+  border-radius: 999px;
   outline: none;
-  transition: border-color var(--transition);
+  transition: border-color var(--transition), background var(--transition);
 }
 
-.search-input:focus { border-color: var(--orange); }
-.search-input::placeholder { color: var(--text-dim); }
+.search-input:focus {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(6, 24, 69, 0.8);
+}
 
+.toolbar-select,
 .toolbar-btn {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  color: var(--text-muted);
-  padding: 6px 12px;
-  font-family: inherit;
-  font-size: 12px;
+  border: 1px solid rgba(229, 246, 255, 0.14);
+  background: rgba(229, 246, 255, 0.08);
+  color: var(--text-bright);
+  border-radius: 999px;
+  padding: 9px 14px;
   cursor: pointer;
-  transition: all var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  transition: transform var(--transition), background var(--transition), border-color var(--transition);
 }
 
-.toolbar-btn:hover { background: var(--card-hover); color: var(--text-bright); }
-.toolbar-btn.active { background: var(--orange); color: white; border-color: var(--orange); }
+.toolbar-btn:hover,
+.toolbar-select:hover {
+  transform: translateY(-1px);
+  background: rgba(229, 246, 255, 0.14);
+}
 
-.toolbar-logo {
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--orange);
-  margin-right: 8px;
-  letter-spacing: -0.3px;
+.toolbar-btn.primary {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(217, 119, 87, 0.24));
+  border-color: rgba(249, 115, 22, 0.32);
+}
+
+.toolbar-btn.active {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.26), rgba(217, 119, 87, 0.34));
+  border-color: rgba(249, 115, 22, 0.45);
 }
 
 .main-panels {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) var(--handle-width) var(--list-width) var(--handle-width) minmax(460px, 1fr) var(--file-handle-width) var(--file-width);
+  height: 100%;
   overflow: hidden;
 }
 
-/* ── Resize Handles ─────────────────────────────────── */
 .resize-handle {
-  width: 4px;
+  position: relative;
   cursor: col-resize;
   background: transparent;
-  transition: background 0.15s;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 20;
+  transition: background var(--transition);
 }
 
 .resize-handle:hover,
 .resize-handle.active {
-  background: var(--claude-terracotta);
+  background: rgba(249, 115, 22, 0.22);
 }
 
 .resize-handle::after {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0; bottom: 0;
-  left: -4px; right: -4px;
+  inset: 0;
+  margin: auto;
+  width: 2px;
+  height: 100%;
+  background: rgba(229, 246, 255, 0.12);
 }
 
-/* ── Sidebar (Projects) ─────────────────────────────── */
+.resize-handle.hidden {
+  cursor: default;
+  pointer-events: none;
+}
+
+.resize-handle.hidden::after {
+  opacity: 0;
+}
+
+.panel {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .sidebar {
-  width: 220px;
-  min-width: 140px;
-  max-width: 400px;
-  background: var(--navy);
-  border-right: 1px solid var(--card-border);
-  overflow-y: auto;
-  padding: 8px 0;
-  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(10, 36, 99, 0.96), rgba(6, 24, 69, 0.98));
+  border-right: 1px solid rgba(229, 246, 255, 0.12);
+  display: flex;
+  flex-direction: column;
 }
 
-.sidebar-header {
-  padding: 8px 14px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-dim);
-}
-
-.project-item {
+.panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: background var(--transition);
-  border-left: 3px solid transparent;
+  gap: 10px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid rgba(229, 246, 255, 0.08);
 }
 
-.project-item:hover { background: var(--card-bg); }
-.project-item.active { background: var(--card-bg); border-left-color: var(--orange); }
+.panel-kicker {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.panel-heading {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 16px;
+}
+
+.panel-header-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sidebar-scroll,
+.list-scroll,
+.main-scroll,
+.file-tree,
+.file-preview {
+  overflow: auto;
+}
+
+.sidebar-scroll {
+  padding: 10px 10px 22px;
+}
+
+.project-tree {
+  display: grid;
+  gap: 4px;
+}
+
+.project-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), transform var(--transition);
+}
+
+.project-item:hover {
+  background: rgba(229, 246, 255, 0.07);
+  color: var(--text-bright);
+  transform: translateX(2px);
+}
+
+.project-item.active {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(217, 119, 87, 0.2));
+  color: var(--text-bright);
+}
+
+.project-item.folder-scope {
+  font-weight: 600;
+}
+
+.project-toggle {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  transition: transform var(--transition), background var(--transition), color var(--transition);
+}
+
+.project-toggle:hover {
+  background: rgba(229, 246, 255, 0.08);
+  color: var(--text-bright);
+}
+
+.project-toggle.expanded {
+  transform: rotate(90deg);
+}
+
+.project-toggle.placeholder {
+  visibility: hidden;
+  cursor: default;
+}
+
+.project-label {
+  min-width: 0;
+}
+
+.project-row-meta {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
 
 .project-name {
+  font-weight: 600;
   font-size: 13px;
-  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .project-count {
+  min-width: 30px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+}
+
+.project-item.active .project-count {
+  color: var(--accent);
+}
+
+.conversations-panel {
+  background: rgba(16, 20, 38, 0.96);
+  border-right: 1px solid rgba(229, 246, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.list-scroll {
+  padding: 14px 14px 22px;
+}
+
+.conversation-card {
+  background: linear-gradient(180deg, rgba(30, 30, 50, 0.88), rgba(21, 21, 40, 0.96));
+  border: 1px solid rgba(229, 246, 255, 0.08);
+  border-radius: 16px;
+  padding: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+  box-shadow: var(--shadow-panel);
+}
+
+.conversation-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(249, 115, 22, 0.28);
+}
+
+.conversation-card.active {
+  border-color: rgba(249, 115, 22, 0.4);
+  box-shadow: 0 12px 30px rgba(249, 115, 22, 0.12);
+}
+
+.conversation-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.conversation-title {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.conversation-project {
+  font-size: 12px;
+  color: var(--accent);
+  opacity: 0.88;
+  margin-top: 2px;
+}
+
+.conversation-date {
   font-size: 11px;
   color: var(--text-dim);
-  background: rgba(255,255,255,0.06);
-  padding: 1px 7px;
-  border-radius: 10px;
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 
-.project-group { margin: 0; }
-
-.group-header {
-  gap: 4px;
-}
-
-.group-header .project-name {
-  font-weight: 600;
-  color: var(--text-muted);
+.conversation-excerpt {
   font-size: 12px;
-  text-transform: capitalize;
-}
-
-.active-group { background: rgba(14, 45, 122, 0.3); }
-
-.project-expand {
-  font-size: 16px;
+  line-height: 1.5;
   color: var(--text-muted);
-  width: 18px;
-  text-align: center;
-  flex-shrink: 0;
-  line-height: 1;
-}
-
-/* ── Conversations Panel ────────────────────────────── */
-.conversations-panel {
-  width: 400px;
-  min-width: 250px;
-  max-width: 700px;
-  border-right: 1px solid var(--claude-border);
-  overflow-y: auto;
-  background: var(--claude-bg);
-  flex-shrink: 0;
-}
-
-.conversations-header {
-  position: sticky;
-  top: 0;
-  background: var(--claude-bg);
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--claude-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  z-index: 10;
-}
-
-.conversations-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.conv-item {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--claude-border);
-  cursor: pointer;
-  transition: background var(--transition);
-}
-
-.conv-item:hover { background: var(--claude-surface); }
-.conv-item.active { background: var(--claude-surface); border-left: 3px solid var(--claude-terracotta); }
-
-.conv-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-bright);
-  margin-bottom: 4px;
-  line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  margin-bottom: 8px;
 }
 
-.conv-meta {
+.conversation-preview-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+}
+
+.conversation-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.manual-resume {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(229, 246, 255, 0.04);
+  border: 1px solid rgba(229, 246, 255, 0.08);
+}
+
+.manual-resume-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.manual-resume code {
+  display: inline-block;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(5, 9, 20, 0.6);
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.pill-btn {
+  border: 1px solid rgba(229, 246, 255, 0.12);
+  background: rgba(229, 246, 255, 0.05);
+  color: var(--text-bright);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pill-btn.primary {
+  background: rgba(217, 119, 87, 0.18);
+  border-color: rgba(217, 119, 87, 0.34);
+}
+
+.main-panel {
+  background: linear-gradient(180deg, rgba(17, 19, 35, 0.98), rgba(12, 15, 30, 1));
+  display: flex;
+  flex-direction: column;
+}
+
+.main-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid rgba(229, 246, 255, 0.08);
+}
+
+.main-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.main-subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.main-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.main-scroll {
+  padding: 24px;
+}
+
+.dashboard-filterbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.dashboard-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(229, 246, 255, 0.06);
+  border: 1px solid rgba(229, 246, 255, 0.10);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.filter-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.dashboard-select {
+  border: 1px solid rgba(229, 246, 255, 0.14);
+  background: rgba(229, 246, 255, 0.06);
+  color: var(--text-bright);
+  border-radius: 12px;
+  padding: 9px 12px;
+  min-width: 140px;
+}
+
+.dashboard-hero {
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 32%),
+    linear-gradient(135deg, rgba(10, 36, 99, 0.85), rgba(6, 24, 69, 0.92));
+  border: 1px solid rgba(229, 246, 255, 0.12);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 18px;
+}
+
+.dashboard-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+  gap: 20px;
+}
+
+.hero-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(229, 246, 255, 0.72);
+  margin-bottom: 10px;
+}
+
+.hero-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(28px, 4vw, 38px);
+  line-height: 1.05;
+  margin: 0 0 12px;
+}
+
+.hero-copy {
+  max-width: 720px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tag {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(229, 246, 255, 0.08);
+  border: 1px solid rgba(229, 246, 255, 0.12);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.hero-note {
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid rgba(229, 246, 255, 0.08);
+}
+
+.hero-note h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.hero-note p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.metric-card,
+.surface-card {
+  background: linear-gradient(180deg, rgba(30, 30, 50, 0.92), rgba(16, 19, 35, 0.96));
+  border: 1px solid rgba(229, 246, 255, 0.08);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  min-width: 0;
+}
+
+.metric-card {
+  padding: 18px;
+}
+
+.metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.metric-value {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 26px;
+  margin-top: 10px;
+}
+
+.metric-caption {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.surface-card {
+  padding: 18px;
+}
+
+.span-6 { grid-column: span 6; }
+.span-5 { grid-column: span 5; }
+.span-4 { grid-column: span 4; }
+.span-7 { grid-column: span 7; }
+.span-8 { grid-column: span 8; }
+.span-12 { grid-column: span 12; }
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 18px;
+}
+
+.section-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
+.legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legend-swatch {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-right: 6px;
+}
+
+.chart-shell {
+  width: 100%;
+}
+
+.chart-caption {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.timeline-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12px, 1fr));
+  gap: 6px;
+  align-items: end;
+  min-height: 220px;
+}
+
+.timeline-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeline-stack {
+  width: 100%;
+  min-height: 170px;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 999px;
+  background: rgba(229, 246, 255, 0.06);
+  overflow: hidden;
+}
+
+.timeline-segment {
+  width: 100%;
+  min-height: 2px;
+}
+
+.timeline-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  transform: rotate(-70deg);
+  transform-origin: center;
+  white-space: nowrap;
+}
+
+.bar-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.bar-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.bar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(229, 246, 255, 0.07);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.bar-value {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: 54px repeat(24, minmax(16px, 1fr));
+  gap: 6px;
+}
+
+.heatmap-hour,
+.heatmap-day {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.heatmap-day {
+  display: flex;
+  align-items: center;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: rgba(229, 246, 255, 0.05);
+  border: 1px solid rgba(229, 246, 255, 0.02);
+}
+
+.heatmap-legend {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  color: var(--text-dim);
-  margin-bottom: 6px;
-}
-
-.conv-meta .dot { color: var(--text-dim); }
-
-.conv-excerpt {
+  margin-top: 12px;
   font-size: 12px;
   color: var(--text-muted);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
-.conv-actions {
+.histogram {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  align-items: flex-end;
+  gap: 10px;
+  min-height: 180px;
 }
 
-.btn-resume {
-  background: var(--claude-terracotta);
-  color: white;
-  border: none;
-  border-radius: 5px;
-  padding: 4px 10px;
-  font-family: inherit;
+.histogram-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.histogram-value {
   font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.btn-resume:hover { background: var(--claude-terracotta-light); }
-
-.btn-resume-alt {
-  background: transparent;
-  color: var(--text-muted);
-  border: 1px solid var(--claude-border);
-  border-radius: 5px;
-  padding: 4px 10px;
-  font-family: inherit;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.btn-resume-alt:hover { background: var(--claude-surface); color: var(--text-bright); }
-
-/* ── Preview Panel ──────────────────────────────────── */
-.preview-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--claude-bg);
-  flex: 1;
-  min-width: 300px;
-}
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--claude-surface);
-  border-bottom: 1px solid var(--claude-border);
-  padding: 0 12px;
-  height: 36px;
-  flex-shrink: 0;
-}
-
-.preview-header-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.preview-header-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.btn-scroll-bottom {
-  background: none;
-  border: 1px solid var(--claude-border);
   color: var(--text-dim);
-  font-size: 14px;
-  cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 4px;
-  transition: all var(--transition);
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
-.btn-scroll-bottom:hover {
-  background: var(--claude-surface-hover);
-  color: var(--text-bright);
-  border-color: var(--claude-terracotta);
+.histogram-fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 12px 12px 4px 4px;
+  background: linear-gradient(180deg, rgba(249, 115, 22, 0.9), rgba(217, 119, 87, 0.72));
 }
 
-/* ── File Browser Panel (4th column, collapsible) ───── */
-.file-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--claude-bg);
-  width: 0;
-  min-width: 0;
-  max-width: 600px;
-  flex-shrink: 0;
-  transition: width 0.2s ease, border 0.2s ease;
-  border-left: 0px solid var(--claude-border);
-}
-
-.file-panel.open {
-  width: 350px;
-  min-width: 200px;
-  border-left: 1px solid var(--claude-border);
-}
-
-.file-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--claude-surface);
-  border-bottom: 1px solid var(--claude-border);
-  padding: 0 12px;
-  height: 36px;
-  flex-shrink: 0;
-}
-
-.file-panel-header-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.file-panel-close {
-  background: none;
-  border: none;
+.histogram-label {
+  font-size: 10px;
   color: var(--text-dim);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
+  transform: rotate(-55deg);
+  white-space: nowrap;
 }
 
-.file-panel-close:hover {
-  background: rgba(255,255,255,0.08);
-  color: var(--text-bright);
-}
-
-.file-panel-content {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.file-panel-tree {
-  overflow-y: auto;
-  flex: 0 0 auto;
-  max-height: 50%;
-  border-bottom: 1px solid var(--claude-border);
-  padding: 4px 0;
-}
-
-.file-panel-preview {
-  flex: 1;
+.table-shell {
   overflow: auto;
-  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(229, 246, 255, 0.08);
 }
 
-.btn-files-toggle {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  color: var(--text-muted);
-  padding: 6px 10px;
-  font-family: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 5px;
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
 }
 
-.btn-files-toggle:hover { background: var(--card-hover); color: var(--text-bright); }
-.btn-files-toggle.active { background: var(--claude-terracotta); color: white; border-color: var(--claude-terracotta); }
-
-.preview-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
+th,
+td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(229, 246, 255, 0.06);
+  text-align: left;
+  vertical-align: top;
 }
 
-/* ── Chat Preview ───────────────────────────────────── */
-.chat-messages { max-width: 700px; }
+th {
+  position: sticky;
+  top: 0;
+  background: rgba(16, 19, 35, 0.98);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
 
-.chat-msg {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  line-height: 1.5;
+tbody tr:hover {
+  background: rgba(229, 246, 255, 0.03);
+}
+
+.table-title {
+  font-weight: 600;
   font-size: 13px;
 }
 
-.chat-msg.user {
-  background: var(--claude-user-bg);
-  border: 1px solid var(--claude-border);
-  margin-left: 40px;
+.table-project,
+.table-secondary {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 
-.chat-msg.assistant {
-  background: var(--claude-assistant-bg);
-  border: 1px solid var(--claude-assistant-border);
-  margin-right: 40px;
+.detail-header {
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 26%),
+    linear-gradient(135deg, rgba(10, 36, 99, 0.84), rgba(17, 19, 35, 0.96));
+  border: 1px solid rgba(229, 246, 255, 0.1);
+  border-radius: 24px;
+  padding: 24px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-soft);
 }
 
-.chat-msg-role {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
-.chat-msg.user .chat-msg-role { color: var(--accent); }
-.chat-msg.assistant .chat-msg-role { color: var(--claude-terracotta); }
-
-.chat-msg-content {
-  color: var(--text-bright);
-  word-break: break-word;
+.meta-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(229, 246, 255, 0.08);
+  border: 1px solid rgba(229, 246, 255, 0.12);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
-.chat-msg-content p { margin-bottom: 8px; }
-.chat-msg-content p:last-child { margin-bottom: 0; }
-.chat-msg-content pre { background: var(--claude-bg); padding: 10px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
-.chat-msg-content code { font-size: 12px; }
-.chat-msg-content ul, .chat-msg-content ol { padding-left: 20px; margin-bottom: 8px; }
-
-.chat-msg-time {
-  font-size: 10px;
-  color: var(--text-dim);
-  margin-top: 6px;
-}
-
-/* ── File Browser ───────────────────────────────────── */
-.file-browser {
+.detail-grid {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  height: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.detail-stat {
+  background: rgba(17, 19, 35, 0.42);
+  border: 1px solid rgba(229, 246, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.detail-stat .value {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 22px;
+  margin-top: 10px;
+}
+
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.transcript.reverse {
+  flex-direction: column-reverse;
+}
+
+.message-card {
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(229, 246, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
   overflow: hidden;
 }
 
+.message-card.user {
+  background: rgba(229, 246, 255, 0.04);
+  border-color: rgba(229, 246, 255, 0.12);
+}
+
+.message-card.assistant {
+  background: rgba(217, 119, 87, 0.08);
+  border-color: rgba(217, 119, 87, 0.18);
+}
+
+.message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.message-role {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.message-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.message-body {
+  color: var(--text-bright);
+  font-size: 14px;
+  line-height: 1.7;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.message-body p { margin: 0 0 10px; }
+.message-body p:last-child { margin-bottom: 0; }
+.message-body p,
+.message-body li,
+.message-body blockquote {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.message-body code {
+  background: rgba(0,0,0,0.28);
+  padding: 2px 5px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.message-body pre {
+  background: rgba(5, 9, 20, 0.72);
+  border-radius: 12px;
+  padding: 14px;
+  overflow: auto;
+  max-width: 100%;
+}
+.message-body pre code {
+  display: block;
+  min-width: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.message-body ul,
+.message-body ol { padding-left: 20px; }
+.message-body blockquote { border-left: 3px solid var(--terracotta); margin: 0; padding-left: 14px; color: var(--text-muted); }
+
+.empty-state {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-shell {
+  max-width: 440px;
+}
+
+.empty-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 24px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(229, 246, 255, 0.08);
+  border: 1px solid rgba(229, 246, 255, 0.1);
+  font-size: 28px;
+}
+
+.empty-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.empty-copy {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.file-panel {
+  width: 0;
+  border-left: 0 solid rgba(229, 246, 255, 0.08);
+  background: rgba(12, 16, 30, 0.98);
+  display: flex;
+  flex-direction: column;
+  transition: width var(--transition), border-color var(--transition);
+}
+
+.file-panel.open {
+  width: 370px;
+  border-left-width: 1px;
+}
+
 .file-tree {
-  overflow-y: auto;
-  border-right: 1px solid var(--claude-border);
-  padding: 8px 0;
+  flex: 0 0 42%;
+  border-bottom: 1px solid rgba(229, 246, 255, 0.06);
+  padding: 10px;
 }
 
 .file-preview {
-  overflow: auto;
-  padding: 16px;
+  flex: 1;
+  padding: 12px 14px 18px;
 }
 
 .tree-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
-  color: var(--text-muted);
-  transition: background var(--transition);
-  white-space: nowrap;
 }
 
-.tree-item:hover { background: var(--claude-surface); color: var(--text-bright); }
-.tree-item.active { background: var(--claude-surface); color: var(--claude-terracotta); }
+.tree-item:hover,
+.tree-item.active {
+  background: rgba(229, 246, 255, 0.06);
+  color: var(--text-bright);
+}
 
-.tree-item .icon { font-size: 14px; flex-shrink: 0; width: 18px; text-align: center; }
-.tree-item.dir .icon { color: var(--orange-light); }
-.tree-item.dir { font-weight: 500; }
+.tree-indent {
+  width: 12px;
+  flex: 0 0 12px;
+}
 
-.tree-indent { display: inline-block; }
-
-.file-content-display {
-  background: var(--claude-surface);
-  border-radius: var(--radius);
-  padding: 16px;
+.file-preview-shell {
+  background: rgba(229, 246, 255, 0.03);
+  border: 1px solid rgba(229, 246, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px;
+  height: 100%;
   overflow: auto;
-  max-height: 100%;
 }
 
-.file-content-display img {
-  max-width: 100%;
-  border-radius: var(--radius);
-}
-
-.file-content-display pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* Markdown rendering */
-.markdown-render { color: var(--text-bright); line-height: 1.6; }
-.markdown-render h1, .markdown-render h2, .markdown-render h3 { color: var(--accent); margin: 16px 0 8px; }
-.markdown-render h1 { font-size: 20px; border-bottom: 1px solid var(--card-border); padding-bottom: 8px; }
-.markdown-render h2 { font-size: 17px; }
-.markdown-render h3 { font-size: 15px; }
-.markdown-render p { margin-bottom: 10px; }
-.markdown-render a { color: var(--claude-terracotta); text-decoration: none; }
-.markdown-render a:hover { text-decoration: underline; }
-.markdown-render code { background: var(--claude-bg); padding: 2px 5px; border-radius: 3px; font-size: 12px; }
-.markdown-render pre code { display: block; padding: 12px; border-radius: 6px; overflow-x: auto; }
-.markdown-render ul, .markdown-render ol { padding-left: 20px; margin-bottom: 10px; }
-.markdown-render blockquote { border-left: 3px solid var(--claude-terracotta); padding-left: 12px; color: var(--text-muted); margin: 10px 0; }
-.markdown-render table { border-collapse: collapse; width: 100%; margin: 10px 0; }
-.markdown-render th, .markdown-render td { border: 1px solid var(--card-border); padding: 6px 10px; text-align: left; }
-.markdown-render th { background: var(--claude-surface); font-weight: 600; }
-.markdown-render img { max-width: 100%; border-radius: 6px; }
-
-/* ── Statusbar ──────────────────────────────────────── */
 .statusbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px;
-  background: var(--navy);
-  border-top: 1px solid var(--card-border);
-  font-size: 11px;
+  gap: 12px;
+  padding: 0 16px;
+  border-top: 1px solid rgba(229, 246, 255, 0.1);
+  background: rgba(10, 36, 99, 0.92);
   color: var(--text-dim);
+  font-size: 11px;
 }
 
-.statusbar-left, .statusbar-right {
+.statusbar-group {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-/* ── Empty States ───────────────────────────────────── */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-dim);
-  text-align: center;
-  padding: 40px;
-}
-
-.empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
-.empty-state .title { font-size: 15px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-.empty-state .desc { font-size: 12px; max-width: 280px; line-height: 1.5; }
-
-/* ── Scrollbar ──────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(229, 246, 255, 0.15); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(229, 246, 255, 0.25); }
-
-/* ── Loading ────────────────────────────────────────── */
-.spinner {
-  width: 20px; height: 20px;
-  border: 2px solid var(--card-border);
-  border-top-color: var(--orange);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Toast ──────────────────────────────────────────── */
 .toast {
   position: fixed;
-  bottom: 40px;
-  right: 20px;
-  background: #dc2626;
+  right: 22px;
+  bottom: 44px;
+  z-index: 999;
+  padding: 10px 14px;
+  border-radius: 12px;
   color: white;
-  padding: 10px 18px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-  z-index: 9999;
-  animation: toastIn 0.3s ease, toastOut 0.3s ease 3s forwards;
-  max-width: 400px;
+  background: rgba(220, 38, 38, 0.94);
+  box-shadow: var(--shadow-soft);
+  animation: toastIn 0.2s ease, toastOut 0.2s ease 3.1s forwards;
 }
-.toast.success { background: #16a34a; }
-@keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+.toast.success {
+  background: rgba(22, 163, 74, 0.94);
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(229, 246, 255, 0.16);
+  border-radius: 999px;
+}
+
+@media (max-width: 1420px) {
+  .card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .main-panels {
+    grid-template-columns: 220px var(--handle-width) 360px var(--handle-width) minmax(360px, 1fr) var(--file-handle-width) var(--file-width);
+  }
+
+  .dashboard-hero-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .span-8,
+  .span-7,
+  .span-6,
+  .span-5,
+  .span-4 {
+    grid-column: span 12;
+  }
+}
 </style>
 </head>
 <body>
-
 <div class="app">
-  <!-- Toolbar -->
+  <div class="accent-bar"></div>
+
   <div class="toolbar">
-    <span class="toolbar-logo">Claude Conversations</span>
-    <div class="search-wrapper">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <input type="text" class="search-input" id="searchInput" placeholder="Search conversations..." />
+    <div class="toolbar-brand">
+      <div class="toolbar-title" id="toolbarTitle">Claude Code Session Dashboard</div>
+      <div class="toolbar-subtitle">Local-first search, resume, and usage insights for Claude Code</div>
     </div>
-    <select class="toolbar-btn" id="sortSelect">
-      <option value="date">Most recent</option>
-      <option value="messages">Most messages</option>
+
+    <div class="search-shell">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-3.5-3.5"></path>
+      </svg>
+      <input class="search-input" id="searchInput" placeholder="Search titles, prompts, and message text">
+    </div>
+
+    <select class="toolbar-select" id="sortSelect">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
       <option value="tokens">Most tokens</option>
+      <option value="cost">Highest cost</option>
+      <option value="messages">Most messages</option>
       <option value="title">Title A-Z</option>
     </select>
-    <button class="btn-files-toggle" id="filesToggleBtn" onclick="toggleFilePanel()" title="Toggle file browser">&#128193; Files</button>
-    <button class="toolbar-btn" id="reindexBtn" title="Re-index conversations">&#8635; Index</button>
+
+    <button class="toolbar-btn primary active" id="overviewBtn">Overview</button>
+    <button class="toolbar-btn" id="filesBtn">Files</button>
+    <button class="toolbar-btn" id="reindexBtn">Reindex</button>
   </div>
 
-  <!-- Main Panels -->
-  <div class="main-panels">
-    <!-- Sidebar: Projects -->
-    <div class="sidebar" id="sidebar">
-      <div class="sidebar-header">Projects</div>
-      <div id="projectList"></div>
-    </div>
-    <div class="resize-handle" data-resize="sidebar"></div>
-
-    <!-- Middle: Conversations -->
-    <div class="conversations-panel" id="conversationsPanel">
-      <div class="conversations-header">
-        <span class="conversations-title" id="convTitle">All conversations</span>
-        <span style="font-size:11px;color:var(--text-dim)" id="convCount"></span>
-      </div>
-      <div id="convList"></div>
-    </div>
-
-    <div class="resize-handle" data-resize="conversations"></div>
-    <!-- Chat Preview -->
-    <div class="preview-panel">
-      <div class="preview-header">
-        <span class="preview-header-title">Chat Preview</span>
-        <div class="preview-header-actions">
-          <button class="btn-scroll-bottom" onclick="scrollToBottom()" title="Scroll naar einde">&#8595; Einde</button>
+  <div class="main-panels" id="mainPanels">
+    <aside class="panel sidebar">
+      <div class="panel-header">
+        <div>
+          <div class="panel-kicker">Projects</div>
+          <div class="panel-heading">Browse sessions</div>
         </div>
+        <div class="panel-header-meta" id="projectMeta">0 projects</div>
       </div>
-      <div class="preview-content" id="previewContent">
-        <div class="empty-state">
-          <div class="icon">&#128172;</div>
-          <div class="title">Select a conversation</div>
-          <div class="desc">Click a conversation to preview messages, or use the search bar.</div>
-        </div>
-      </div>
-    </div>
+      <div class="sidebar-scroll" id="projectList"></div>
+    </aside>
 
-    <!-- File Browser (4th panel, collapsible) -->
-    <div class="resize-handle" data-resize="filePanel" id="filePanelResize" style="display:none"></div>
-    <div class="file-panel" id="filePanel">
-      <div class="file-panel-header">
-        <span class="file-panel-header-title">Files</span>
-        <button class="file-panel-close" onclick="toggleFilePanel()" title="Close file browser">&times;</button>
-      </div>
-      <div class="file-panel-content">
-        <div class="file-panel-tree" id="filePanelTree"></div>
-        <div class="file-panel-preview" id="filePanelPreview">
-          <div class="empty-state"><div class="icon">&#128196;</div><div class="title">Select a file</div></div>
+    <div class="resize-handle" data-resize="sidebar" title="Resize projects"></div>
+
+    <section class="panel conversations-panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-kicker">Conversation Manager</div>
+          <div class="panel-heading" id="conversationPanelTitle">All sessions</div>
         </div>
+        <div class="panel-header-meta" id="conversationCount">0 sessions</div>
       </div>
-    </div>
+      <div class="list-scroll" id="conversationList"></div>
+    </section>
+
+    <div class="resize-handle" data-resize="list" title="Resize session list"></div>
+
+    <main class="panel main-panel">
+      <div class="main-topbar">
+        <div>
+          <div class="main-title" id="mainTitle">Usage overview</div>
+          <div class="main-subtitle" id="mainSubtitle">Loading Claude Code session metrics...</div>
+        </div>
+        <div class="main-actions" id="mainActions"></div>
+      </div>
+      <div class="main-scroll" id="mainContent"></div>
+    </main>
+
+    <div class="resize-handle hidden" id="fileResizeHandle" data-resize="file" title="Resize file browser"></div>
+
+    <aside class="panel file-panel" id="filePanel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-kicker">File Browser</div>
+          <div class="panel-heading">Local files</div>
+        </div>
+        <button class="toolbar-btn" id="closeFilesBtn">Close</button>
+      </div>
+      <div class="file-tree" id="fileTree"></div>
+      <div class="file-preview" id="filePreview"></div>
+    </aside>
   </div>
 
-  <!-- Statusbar -->
   <div class="statusbar">
-    <div class="statusbar-left">
-      <span id="statusTotal">Loading...</span>
+    <div class="statusbar-group">
+      <span id="statusSessions">Loading sessions...</span>
+      <span id="statusTokens"></span>
+      <span id="statusCost"></span>
     </div>
-    <div class="statusbar-right">
-      <span id="statusIndexed"></span>
-      <span>Claude Conversations</span>
+    <div class="statusbar-group">
+      <span id="statusLastIndexed"></span>
+      <span id="statusTerminal"></span>
     </div>
   </div>
 </div>
 
 <script>
-// ── State ─────────────────────────────────────────────
-let state = {
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+  highlight(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value;
+    }
+    return hljs.highlightAuto(code).value;
+  },
+});
+
+const state = {
+  appStats: null,
   projects: [],
   conversations: [],
+  dashboard: null,
   selectedProject: 'all',
-  selectedConv: null,
-  currentTab: 'chat',
+  selectedConversationId: null,
+  selectedConversationDetail: null,
   searchQuery: '',
-  sort: 'date',
+  sort: 'newest',
   fileTree: null,
+  filePanelOpen: false,
+  selectedFilePath: null,
+  view: 'dashboard',
+  searchTimer: null,
+  dashboardRange: '30d',
+  dashboardMonth: null,
+  expandedProjectPaths: new Set(['all']),
+  transcriptOrder: 'newest',
 };
+let initStarted = false;
+const UI_STATE_STORAGE_KEY = 'claude-session-dashboard.ui.v1';
 
-// ── Init ──────────────────────────────────────────────
-async function init() {
-  await loadProjects();
-  await loadConversations();
-  await loadStats();
+function escHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
-// Wait for pywebview API to be ready
-window.addEventListener('pywebviewready', init);
-
-// ── API Helpers ───────────────────────────────────────
-async function api(method, ...args) {
-  return await window.pywebview.api[method](...args);
+function formatDate(value) {
+  if (!value) return 'Unknown date';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
-// ── Projects ──────────────────────────────────────────
-async function loadProjects() {
-  state.projects = await api('get_projects');
-  renderProjects();
+function formatDateTime(value) {
+  if (!value) return 'Unknown date';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatTokens(value) {
+  const amount = Number(value || 0);
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(amount >= 10_000_000 ? 1 : 2)}M`;
+  if (amount >= 1_000) return `${(amount / 1_000).toFixed(amount >= 100_000 ? 0 : 1)}k`;
+  return amount.toLocaleString();
+}
+
+function formatMoney(value) {
+  return `$${Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: value >= 100 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatDuration(seconds) {
+  const totalSeconds = Math.max(0, Number(seconds || 0));
+  const totalMinutes = Math.round(totalSeconds / 60);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0 && hours > 0) return `${days}d ${hours}h`;
+  if (days > 0) return `${days}d`;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${Math.max(1, totalMinutes)}m`;
+}
+
+function shortSessionId(sessionId) {
+  return sessionId ? sessionId.slice(0, 8) : '--------';
+}
+
+function relativeProjectName(projectPath) {
+  if (!projectPath) return 'Unknown project';
+  const parts = projectPath.split('/').filter(Boolean);
+  return parts.slice(-2).join('/') || projectPath;
+}
+
+function loadUiState() {
+  try {
+    const raw = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved.sort === 'date') {
+      state.sort = 'newest';
+    } else if (['newest', 'oldest', 'tokens', 'cost', 'messages', 'title'].includes(saved.sort)) {
+      state.sort = saved.sort;
+    }
+    if (['7d', '30d', '90d', 'month'].includes(saved.dashboardRange)) {
+      state.dashboardRange = saved.dashboardRange;
+    }
+    if (typeof saved.dashboardMonth === 'string' || saved.dashboardMonth === null) {
+      state.dashboardMonth = saved.dashboardMonth;
+    }
+    if (typeof saved.selectedProject === 'string' && saved.selectedProject) {
+      state.selectedProject = saved.selectedProject;
+    }
+    if (['newest', 'oldest'].includes(saved.transcriptOrder)) {
+      state.transcriptOrder = saved.transcriptOrder;
+    }
+    if (Array.isArray(saved.expandedProjectPaths)) {
+      state.expandedProjectPaths = new Set(saved.expandedProjectPaths);
+    }
+  } catch (_error) {
+    // Ignore invalid persisted UI state and fall back to defaults.
+  }
+}
+
+function persistUiState() {
+  try {
+    window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify({
+      sort: state.sort,
+      dashboardRange: state.dashboardRange,
+      dashboardMonth: state.dashboardMonth,
+      selectedProject: state.selectedProject,
+      transcriptOrder: state.transcriptOrder,
+      expandedProjectPaths: Array.from(state.expandedProjectPaths),
+    }));
+  } catch (_error) {
+    // Ignore storage failures in private browsing or locked-down environments.
+  }
 }
 
 function buildProjectTree(projects) {
-  // Build a nested tree from flat project paths like "Content/blog", "Content/linkedin"
-  const tree = { children: {}, items: [], count: 0 };
+  const root = {
+    label: 'All projects',
+    scopePath: 'all',
+    count: projects.reduce((sum, project) => sum + Number(project.count || 0), 0),
+    latest: projects[0]?.latest || null,
+    children: [],
+    childMap: new Map(),
+    depth: 0,
+  };
 
-  for (const p of projects) {
-    if (p.project_path === 'root') {
-      tree.items.push(p);
-      tree.count += p.count;
-      continue;
-    }
-    const parts = p.project_path.split('/');
-    let node = tree;
-    for (let i = 0; i < parts.length; i++) {
-      const key = parts[i];
-      if (!node.children[key]) {
-        node.children[key] = { children: {}, items: [], count: 0, path: parts.slice(0, i + 1).join('/') };
+  for (const project of projects) {
+    const segments = (project.project_path || 'unknown').split('/').filter(Boolean);
+    let current = root;
+    let cumulative = '';
+
+    segments.forEach((segment, index) => {
+      cumulative = cumulative ? `${cumulative}/${segment}` : segment;
+      if (!current.childMap.has(segment)) {
+        const child = {
+          label: segment,
+          scopePath: cumulative,
+          count: 0,
+          latest: null,
+          children: [],
+          childMap: new Map(),
+          depth: index + 1,
+        };
+        current.childMap.set(segment, child);
+        current.children.push(child);
       }
-      node.children[key].count += p.count;
-      node = node.children[key];
-    }
-    node.items.push(p);
-    tree.count += p.count;
+
+      current = current.childMap.get(segment);
+      current.count += Number(project.count || 0);
+      if (!current.latest || (project.latest && project.latest > current.latest)) {
+        current.latest = project.latest;
+      }
+    });
   }
-  return tree;
+
+  const finalize = (node) => {
+    node.children.sort((left, right) => {
+      if ((right.count || 0) !== (left.count || 0)) {
+        return (right.count || 0) - (left.count || 0);
+      }
+      return left.label.localeCompare(right.label);
+    });
+    node.children.forEach(finalize);
+    delete node.childMap;
+    return node;
+  };
+
+  return finalize(root);
+}
+
+function ensureExpandedForPath(scopePath) {
+  if (!scopePath || scopePath === 'all') return;
+  const segments = scopePath.split('/').filter(Boolean);
+  let cumulative = '';
+  segments.forEach((segment) => {
+    cumulative = cumulative ? `${cumulative}/${segment}` : segment;
+    state.expandedProjectPaths.add(cumulative);
+  });
+}
+
+function modelColor(index) {
+  const palette = ['#8bd3ff', '#F97316', '#D97757', '#f4b942', '#7dd3fc'];
+  return palette[index % palette.length];
+}
+
+async function waitForApi() {
+  while (!(window.pywebview && window.pywebview.api)) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+async function callApi(method, ...args) {
+  await waitForApi();
+  return window.pywebview.api[method](...args);
+}
+
+async function init() {
+  if (initStarted) return;
+  initStarted = true;
+  loadUiState();
+  applyPanelWidths();
+  bindEvents();
+  bindResizeHandles();
+  document.getElementById('sortSelect').value = state.sort;
+  await Promise.all([
+    loadProjects(),
+    loadConversations(),
+    loadDashboard(),
+    updateStatusbar(),
+  ]);
+  renderMainPanel();
+}
+
+function bindEvents() {
+  document.getElementById('overviewBtn').addEventListener('click', () => {
+    state.view = 'dashboard';
+    state.selectedConversationId = null;
+    state.selectedConversationDetail = null;
+    renderConversationList();
+    renderMainPanel();
+  });
+
+  document.getElementById('filesBtn').addEventListener('click', toggleFilePanel);
+  document.getElementById('closeFilesBtn').addEventListener('click', toggleFilePanel);
+  document.getElementById('reindexBtn').addEventListener('click', reindexData);
+
+  document.getElementById('searchInput').addEventListener('input', (event) => {
+    clearTimeout(state.searchTimer);
+    state.searchQuery = event.target.value.trim();
+    state.searchTimer = setTimeout(async () => {
+      await loadConversations();
+    }, 180);
+  });
+
+  document.getElementById('sortSelect').addEventListener('change', async (event) => {
+    state.sort = event.target.value;
+    persistUiState();
+    await loadConversations();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+      event.preventDefault();
+      document.getElementById('searchInput').focus();
+    }
+    if (event.key === 'Escape') {
+      if (state.filePanelOpen) {
+        toggleFilePanel();
+        return;
+      }
+      state.view = 'dashboard';
+      state.selectedConversationId = null;
+      state.selectedConversationDetail = null;
+      renderConversationList();
+      renderMainPanel();
+    }
+  });
+}
+
+async function loadProjects() {
+  const projects = await callApi('get_projects');
+  state.projects = Array.isArray(projects) ? projects : [];
+  renderProjects();
+}
+
+async function loadConversations() {
+  const conversations = await callApi(
+    'get_conversations',
+    state.selectedProject,
+    state.searchQuery || null,
+    state.sort,
+    250,
+    0
+  );
+  state.conversations = Array.isArray(conversations) ? conversations : [];
+  renderConversationList();
+}
+
+async function loadDashboard() {
+  state.dashboard = await callApi(
+    'get_dashboard_payload',
+    state.selectedProject,
+    state.dashboardRange,
+    state.dashboardMonth
+  );
+  if (state.dashboard?.filters?.month) {
+    state.dashboardMonth = state.dashboard.filters.month;
+  }
+  persistUiState();
+  if (state.view === 'dashboard') {
+    renderMainPanel();
+  }
+}
+
+async function loadConversationDetail(sessionId) {
+  state.selectedConversationId = sessionId;
+  state.view = 'detail';
+  renderConversationList();
+  setMainHeader('Loading session detail...', 'Reading Claude Code transcript and usage breakdown.');
+  document.getElementById('mainContent').innerHTML = renderLoadingState();
+  const detail = await callApi('get_session_detail', sessionId);
+  state.selectedConversationDetail = detail;
+  renderMainPanel();
+}
+
+async function updateStatusbar() {
+  const stats = await callApi('get_stats');
+  state.appStats = stats;
+  const terminal = await callApi('get_terminal_name');
+  document.getElementById('statusSessions').textContent = `${Number(stats.total_conversations || 0).toLocaleString()} indexed sessions`;
+  document.getElementById('statusTokens').textContent = `${formatTokens(stats.total_tokens)} tokens`;
+  document.getElementById('statusCost').textContent = `${formatMoney(stats.estimated_cost_usd)} estimated cost`;
+  document.getElementById('statusLastIndexed').textContent = `Last indexed: ${stats.last_indexed === 'never' ? 'never' : formatDateTime(stats.last_indexed)}`;
+  document.getElementById('statusTerminal').textContent = `Resume terminal: ${terminal}`;
+  document.getElementById('toolbarTitle').textContent = `Claude Code Session Dashboard · ${Number(stats.total_conversations || 0).toLocaleString()} sessions`;
 }
 
 function renderProjects() {
-  const el = document.getElementById('projectList');
+  const container = document.getElementById('projectList');
+  document.getElementById('projectMeta').textContent = `${state.projects.length.toLocaleString()} projects`;
+  ensureExpandedForPath(state.selectedProject);
   const tree = buildProjectTree(state.projects);
+  container.innerHTML = `<div class="project-tree">${renderProjectNode(tree)}</div>`;
 
-  let html = `<div class="project-item ${state.selectedProject === 'all' ? 'active' : ''}" onclick="selectProject('all')">
-    <span class="project-name">All projects</span>
-    <span class="project-count">${tree.count}</span>
-  </div>`;
-
-  // Render root-level items
-  for (const p of tree.items) {
-    const rootName = p.project_path.split('/').pop() || p.project_path;
-    html += renderProjectItem(p, rootName, 0);
-  }
-
-  // Render children as collapsible groups
-  html += renderProjectNode(tree, 0);
-
-  el.innerHTML = html;
-}
-
-function renderProjectNode(node, depth) {
-  let html = '';
-  const sortedKeys = Object.keys(node.children).sort();
-
-  for (const key of sortedKeys) {
-    const child = node.children[key];
-    const hasSubfolders = Object.keys(child.children).length > 0;
-    const indent = depth * 12;
-    const isExpanded = state.expandedProjects && state.expandedProjects.has(child.path);
-
-    if (hasSubfolders) {
-      // Folder with subfolders — collapsible group header
-      const isSelectedGroup = state.selectedProject?.startsWith(child.path);
-      html += `<div class="project-group" style="padding-left:${indent}px">
-        <div class="project-item group-header ${isSelectedGroup ? 'active-group' : ''}" onclick="toggleProjectGroup('${child.path}')">
-          <span class="project-expand">${isExpanded ? '&#9662;' : '&#9656;'}</span>
-          <span class="project-name">${escHtml(key)}</span>
-          <span class="project-count">${child.count}</span>
-        </div>`;
-
-      if (isExpanded) {
-        // Render direct items of this folder
-        for (const p of child.items) {
-          const leafName = p.project_path.split('/').pop();
-          html += renderProjectItem(p, leafName, depth + 1);
-        }
-        // Render sub-children
-        html += renderProjectNode(child, depth + 1);
-      }
-      html += '</div>';
-    } else {
-      // Leaf folder — direct clickable
-      for (const p of child.items) {
-        const leafName = p.project_path.split('/').pop();
-        html += renderProjectItem(p, leafName, depth);
-      }
-    }
-  }
-  return html;
-}
-
-function renderProjectItem(p, displayName, depth) {
-  const indent = depth * 12;
-  return `<div class="project-item ${state.selectedProject === p.project_path ? 'active' : ''}"
-               style="padding-left:${14 + indent}px"
-               onclick="selectProject('${p.project_path}')">
-    <span class="project-name">${escHtml(displayName)}</span>
-    <span class="project-count">${p.count}</span>
-  </div>`;
-}
-
-function toggleProjectGroup(path) {
-  if (!state.expandedProjects) state.expandedProjects = new Set();
-  if (state.expandedProjects.has(path)) {
-    state.expandedProjects.delete(path);
-  } else {
-    state.expandedProjects.add(path);
-  }
-  renderProjects();
-}
-
-async function selectProject(path) {
-  state.selectedProject = path;
-  renderProjects();
-  await loadConversations();
-}
-
-// ── Conversations ─────────────────────────────────────
-async function loadConversations() {
-  const project = state.selectedProject === 'all' ? null : state.selectedProject;
-  state.conversations = await api('get_conversations', project, state.searchQuery || null, state.sort, 200, 0);
-  renderConversations();
-}
-
-function renderConversations() {
-  const el = document.getElementById('convList');
-  const titleEl = document.getElementById('convTitle');
-  const countEl = document.getElementById('convCount');
-
-  const name = state.selectedProject === 'all' ? 'All conversations' :
-    (state.selectedProject === 'root' ? 'BUSINESS (root)' : state.selectedProject);
-  titleEl.textContent = name;
-  countEl.textContent = `${state.conversations.length} results`;
-
-  if (!state.conversations.length) {
-    el.innerHTML = `<div class="empty-state" style="padding-top:60px">
-      <div class="icon">&#128269;</div>
-      <div class="title">No conversations found</div>
-      <div class="desc">${state.searchQuery ? 'Try different search terms.' : 'No data for this project.'}</div>
-    </div>`;
-    return;
-  }
-
-  let html = '';
-  for (const c of state.conversations) {
-    const date = formatDate(c.last_message);
-    const isActive = state.selectedConv === c.session_id;
-    const excerpt = (c.excerpt || '').split('---')[0].trim();
-    const tokens = c.total_tokens ? formatTokens(c.total_tokens) : '';
-
-    html += `<div class="conv-item ${isActive ? 'active' : ''}" onclick="selectConv('${c.session_id}')">
-      <div class="conv-title">${escHtml(c.title || '(untitled)')}</div>
-      <div class="conv-meta">
-        <span>${date}</span>
-        <span class="dot">&middot;</span>
-        <span>${c.message_count} msgs</span>
-        ${tokens ? `<span class="dot">&middot;</span><span>${tokens}</span>` : ''}
-        ${c.project_path !== 'root' ? `<span class="dot">&middot;</span><span>${escHtml(c.project_path)}</span>` : ''}
-      </div>
-      <div class="conv-excerpt">${escHtml(excerpt)}</div>
-      <div class="conv-actions">
-        <button class="btn-resume" onclick="event.stopPropagation(); openInTerminal('${c.session_id}', '${escAttr(c.cwd)}')">
-          &#9654; Resume
-        </button>
-        <button class="btn-resume-alt" onclick="event.stopPropagation(); exportConv('${c.session_id}', 'markdown')">
-          Export
-        </button>
-      </div>
-    </div>`;
-  }
-  el.innerHTML = html;
-}
-
-async function selectConv(sessionId) {
-  state.selectedConv = sessionId;
-  renderConversations();
-  await loadChatPreview(sessionId);
-}
-
-// ── Chat Preview ──────────────────────────────────────
-async function loadChatPreview(sessionId) {
-  const el = document.getElementById('previewContent');
-  el.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
-
-  const messages = await api('get_conversation_messages', sessionId);
-  if (!messages || !messages.length) {
-    el.innerHTML = '<div class="empty-state"><div class="title">No messages</div></div>';
-    return;
-  }
-
-  let html = '<div class="chat-messages">';
-  for (const m of messages) {
-    if (!m.content || m.content.length < 2) continue;
-    const rendered = m.role === 'assistant' ? renderMarkdown(m.content) : escHtml(m.content);
-    const time = m.timestamp ? formatTime(m.timestamp) : '';
-
-    html += `<div class="chat-msg ${m.role}">
-      <div class="chat-msg-role">${m.role === 'user' ? 'Jij' : 'Claude'}</div>
-      <div class="chat-msg-content">${rendered}</div>
-      ${time ? `<div class="chat-msg-time">${time}</div>` : ''}
-    </div>`;
-  }
-  html += '</div>';
-  el.innerHTML = html;
-
-  // Apply syntax highlighting
-  el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-}
-
-// ── File Browser ──────────────────────────────────────
-
-function renderTreeNode(node, depth) {
-  if (!node) return '';
-  let html = '';
-  const indent = depth * 16;
-
-  if (node.type === 'directory') {
-    html += `<div class="tree-item dir" style="padding-left:${8 + indent}px" onclick="toggleDir(this)">
-      <span class="icon">&#128193;</span>
-      <span>${escHtml(node.name)}</span>
-    </div>`;
-    if (node.children) {
-      html += `<div class="tree-children" style="display:none">`;
-      for (const child of node.children) {
-        html += renderTreeNode(child, depth + 1);
-      }
-      html += '</div>';
-    }
-  } else {
-    const icon = getFileIcon(node.extension);
-    html += `<div class="tree-item" style="padding-left:${8 + indent}px" onclick="previewFile('${escAttr(node.path)}')">
-      <span class="icon">${icon}</span>
-      <span>${escHtml(node.name)}</span>
-    </div>`;
-  }
-  return html;
-}
-
-function toggleDir(el) {
-  const children = el.nextElementSibling;
-  if (children && children.classList.contains('tree-children')) {
-    children.style.display = children.style.display === 'none' ? 'block' : 'none';
-  }
-}
-
-async function previewFile(filePath) {
-  const el = document.getElementById('filePanelPreview');
-  el.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
-
-  // Remove active from all tree items, add to clicked
-  document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('active'));
-  event.currentTarget?.classList.add('active');
-
-  const result = await api('read_file', filePath);
-
-  if (result.type === 'error') {
-    el.innerHTML = `<div class="empty-state"><div class="title">Kan niet openen</div><div class="desc">${escHtml(result.content)}</div></div>`;
-    return;
-  }
-
-  if (result.type === 'image') {
-    el.innerHTML = `<div class="file-content-display"><img src="${result.content}" /></div>`;
-    return;
-  }
-
-  if (result.type === 'svg') {
-    el.innerHTML = `<div class="file-content-display">${result.content}</div>`;
-    return;
-  }
-
-  if (result.type === 'text') {
-    if (result.extension === '.md') {
-      // Render markdown
-      el.innerHTML = `<div class="file-content-display markdown-render">${renderMarkdown(result.content)}</div>`;
-    } else if (result.extension === '.html' || result.extension === '.htm') {
-      // Show HTML source + rendered preview
-      const highlighted = hljs.highlight(result.content, { language: 'html' }).value;
-      el.innerHTML = `<div class="file-content-display"><pre><code class="hljs">${highlighted}</code></pre></div>`;
-    } else {
-      const lang = result.language || 'plaintext';
-      let highlighted;
-      try {
-        highlighted = hljs.highlight(result.content, { language: lang }).value;
-      } catch {
-        highlighted = escHtml(result.content);
-      }
-      el.innerHTML = `<div class="file-content-display"><pre><code class="hljs">${highlighted}</code></pre></div>`;
-    }
-    return;
-  }
-
-  el.innerHTML = `<div class="file-content-display"><pre>${escHtml(result.content || 'Empty file')}</pre></div>`;
-}
-
-function getFileIcon(ext) {
-  const icons = {
-    '.md': '&#128221;', '.py': '&#128013;', '.js': '&#9889;', '.ts': '&#128310;',
-    '.json': '&#123;&#125;', '.html': '&#127760;', '.css': '&#127912;',
-    '.sql': '&#128450;', '.yaml': '&#9881;', '.yml': '&#9881;',
-    '.sh': '&#128187;', '.png': '&#128248;', '.jpg': '&#128248;',
-    '.jpeg': '&#128248;', '.svg': '&#128248;', '.gif': '&#128248;',
-    '.txt': '&#128196;', '.env': '&#128274;',
-  };
-  return icons[ext] || '&#128196;';
-}
-
-// ── Scroll to bottom ──────────────────────────────────
-function scrollToBottom() {
-  const el = document.getElementById('previewContent');
-  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-}
-
-// ── File Panel Toggle ─────────────────────────────────
-async function toggleFilePanel() {
-  const panel = document.getElementById('filePanel');
-  const btn = document.getElementById('filesToggleBtn');
-  const isOpen = panel.classList.contains('open');
-
-  const resizeHandle = document.getElementById('filePanelResize');
-  if (isOpen) {
-    panel.classList.remove('open');
-    btn.classList.remove('active');
-    resizeHandle.style.display = 'none';
-  } else {
-    panel.classList.add('open');
-    btn.classList.add('active');
-    resizeHandle.style.display = 'block';
-    if (!state.fileTree) {
-      state.fileTree = await api('get_file_tree');
-    }
-    document.getElementById('filePanelTree').innerHTML = renderTreeNode(state.fileTree, 0);
-  }
-}
-
-// ── Terminal ──────────────────────────────────────────
-async function openInTerminal(sessionId, cwd) {
-  const result = await api('open_in_terminal', sessionId, cwd);
-  if (result.ok) {
-    showToast('Opened in terminal', 'success');
-  } else {
-    showToast(`Error: ${result.error}`, 'error');
-  }
-}
-
-// ── Export ────────────────────────────────────────────
-async function exportConv(sessionId, format) {
-  const result = await api('export_conversation', sessionId, format || 'markdown');
-  if (result.ok) {
-    // Copy to clipboard
-    navigator.clipboard.writeText(result.content).then(() => {
-      showToast(`Exported as ${format} — copied to clipboard`, 'success');
-    }).catch(() => {
-      // Fallback: download as file
-      const blob = new Blob([result.content], {type: 'text/plain'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = result.filename; a.click();
-      URL.revokeObjectURL(url);
-      showToast(`Exported as ${result.filename}`, 'success');
+  container.querySelectorAll('.project-item').forEach((element) => {
+    element.addEventListener('click', async () => {
+      state.selectedProject = element.dataset.project;
+      state.selectedConversationId = null;
+      state.selectedConversationDetail = null;
+      state.view = 'dashboard';
+      ensureExpandedForPath(state.selectedProject);
+      persistUiState();
+      renderProjects();
+      await loadConversations();
+      await loadDashboard();
+      renderMainPanel();
     });
-  } else {
-    showToast(`Export failed: ${result.error}`, 'error');
+  });
+
+  container.querySelectorAll('.project-toggle').forEach((button) => {
+    if (button.classList.contains('placeholder')) return;
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const scopePath = button.dataset.project;
+      if (state.expandedProjectPaths.has(scopePath)) {
+        state.expandedProjectPaths.delete(scopePath);
+      } else {
+        state.expandedProjectPaths.add(scopePath);
+      }
+      persistUiState();
+      renderProjects();
+    });
+  });
+}
+
+function renderProjectNode(node) {
+  const isExpanded = state.expandedProjectPaths.has(node.scopePath);
+  const isActive = state.selectedProject === node.scopePath;
+  const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+  const indent = Math.max(0, node.depth * 14);
+  const toggleClass = hasChildren ? (isExpanded ? 'project-toggle expanded' : 'project-toggle') : 'project-toggle placeholder';
+  const itemClass = `${isActive ? 'active ' : ''}${hasChildren ? 'folder-scope' : ''}`.trim();
+  const meta = node.latest ? `<div class="project-row-meta">${escHtml(formatDate(node.latest))}</div>` : '';
+  const children = hasChildren && isExpanded
+    ? node.children.map((child) => renderProjectNode(child)).join('')
+    : '';
+
+  return `
+    <div>
+      <div class="project-item ${itemClass}" data-project="${escHtml(node.scopePath)}" style="padding-left:${12 + indent}px">
+        <button class="${toggleClass}" data-project="${escHtml(node.scopePath)}" aria-label="${hasChildren ? 'Toggle folder' : 'No child folders'}">${hasChildren ? '›' : '·'}</button>
+        <div class="project-label">
+          <div class="project-name">${escHtml(node.label)}</div>
+          ${meta}
+        </div>
+        <div class="project-count">${Number(node.count || 0).toLocaleString()}</div>
+      </div>
+      ${children}
+    </div>
+  `;
+}
+
+function renderConversationList() {
+  const title = state.selectedProject === 'all'
+    ? 'All sessions'
+    : relativeProjectName(state.selectedProject);
+  document.getElementById('conversationPanelTitle').textContent = title;
+  document.getElementById('conversationCount').textContent = `${state.conversations.length.toLocaleString()} sessions`;
+
+  const container = document.getElementById('conversationList');
+  if (!state.conversations.length) {
+    const missingProjectsDir = state.appStats && state.appStats.projects_dir_exists === false;
+    const emptyTitle = state.searchQuery
+      ? 'No matching sessions'
+      : (missingProjectsDir ? 'Claude Code folder not found' : 'No indexed sessions yet');
+    const emptyCopy = state.searchQuery
+      ? 'Try a broader search query or switch to a different Claude Code project.'
+      : (missingProjectsDir
+        ? `The dashboard looks for Claude Code sessions in ${state.appStats.projects_dir}. Start Claude Code once or update claude_projects_dir in the config file.`
+        : 'Run a reindex after Claude Code creates local session files, or switch to another project scope.');
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-shell">
+          <div class="empty-icon">⌕</div>
+          <div class="empty-title">${escHtml(emptyTitle)}</div>
+          <div class="empty-copy">${escHtml(emptyCopy)}</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = state.conversations.map((conversation) => {
+    const active = state.selectedConversationId === conversation.session_id ? 'active' : '';
+    const previewLabel = state.sort === 'oldest' ? 'First message' : 'Latest message';
+    const previewText = state.sort === 'oldest'
+      ? (conversation.first_preview || conversation.excerpt || 'No preview available.')
+      : (conversation.last_preview || conversation.excerpt || 'No preview available.');
+    const activityDate = state.sort === 'oldest'
+      ? (conversation.created_at || conversation.first_message)
+      : (conversation.last_message_at || conversation.last_message);
+    return `
+      <article class="conversation-card ${active}" data-session="${escHtml(conversation.session_id)}">
+        <div class="conversation-topline">
+          <div>
+            <div class="conversation-title">${escHtml(conversation.title || '(untitled)')}</div>
+            <div class="conversation-project">${escHtml(relativeProjectName(conversation.project_path))}</div>
+          </div>
+          <div class="conversation-date">${escHtml(formatDate(activityDate))}</div>
+        </div>
+
+        <div class="conversation-preview-label">${escHtml(previewLabel)}</div>
+        <div class="conversation-excerpt">${escHtml(previewText)}</div>
+
+        <div class="conversation-actions">
+          <button class="pill-btn primary" data-action="resume">Resume</button>
+          <button class="pill-btn" data-action="terminal">Terminal</button>
+          <button class="pill-btn" data-action="vscode">VS Code</button>
+          <button class="pill-btn" data-action="export">Export</button>
+          <button class="pill-btn" data-action="copy">Copy command</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.conversation-card').forEach((card) => {
+    const sessionId = card.dataset.session;
+    card.addEventListener('click', () => loadConversationDetail(sessionId));
+    card.querySelector('[data-action="resume"]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      const conversation = state.conversations.find((entry) => entry.session_id === sessionId);
+      openInTerminal(sessionId, conversation?.cwd || '');
+    });
+    card.querySelector('[data-action="terminal"]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      const conversation = state.conversations.find((entry) => entry.session_id === sessionId);
+      openInTerminal(sessionId, conversation?.cwd || '', 'terminal');
+    });
+    card.querySelector('[data-action="vscode"]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      const conversation = state.conversations.find((entry) => entry.session_id === sessionId);
+      openInTerminal(sessionId, conversation?.cwd || '', 'vscode');
+    });
+    card.querySelector('[data-action="export"]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      exportConversation(sessionId, 'markdown');
+    });
+    card.querySelector('[data-action="copy"]').addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const conversation = state.conversations.find((entry) => entry.session_id === sessionId);
+      await copyText(conversation?.resume_command || `claude -r ${sessionId}`);
+      showToast('Resume command copied', 'success');
+    });
+  });
+}
+
+function renderMainPanel() {
+  if (state.view === 'detail' && state.selectedConversationDetail) {
+    renderConversationDetail();
+    return;
+  }
+  renderDashboard();
+}
+
+function setMainHeader(title, subtitle, actions = '') {
+  document.getElementById('mainTitle').textContent = title;
+  document.getElementById('mainSubtitle').textContent = subtitle;
+  document.getElementById('mainActions').innerHTML = actions;
+}
+
+function renderDashboard() {
+  const dashboard = state.dashboard;
+  document.getElementById('overviewBtn').classList.add('active');
+  if (!dashboard) {
+    setMainHeader('Usage overview', 'Loading Claude Code metrics...');
+    document.getElementById('mainContent').innerHTML = renderLoadingState();
+    return;
+  }
+
+  setMainHeader(
+    'Usage overview',
+    'One local dashboard for conversation history, model usage, and cost trends.',
+    `<button class="toolbar-btn primary" onclick="loadDashboard()">Refresh overview</button>`
+  );
+
+  const overview = dashboard.overview;
+  const filters = dashboard.filters || {};
+  const pricing = dashboard.pricing;
+  const dailySubtitle = `Assistant tokens by day for ${filters.range_label || 'the selected range'}`;
+  const costSubtitle = `Estimated cost by assistant message timestamp for ${filters.range_label || 'the selected range'}`;
+  const timelineSubtitle = `Daily token mix for the top models in ${filters.range_label || 'the selected range'}`;
+  const activeTimeSubtitle = `Unique active time by day for ${filters.range_label || 'the selected range'}`;
+  const busiestDay = overview.busiest_active_day?.date
+    ? `${formatDate(overview.busiest_active_day.date)} · ${formatDuration(overview.busiest_active_day.seconds)}`
+    : 'No active day in scope';
+  const heroTags = [
+    `Top model: ${overview.top_model_label}`,
+    `${overview.active_days.toLocaleString()} active days`,
+    `${pricing.coverage_pct}% pricing coverage`,
+  ];
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="dashboard-filterbar">
+      <div class="dashboard-filter-group">
+        <div>
+          <div class="filter-label">Usage scope</div>
+          <div class="filter-chip">${escHtml(state.selectedProject === 'all' ? 'All projects' : relativeProjectName(state.selectedProject))}</div>
+        </div>
+        <div>
+          <div class="filter-label">Range</div>
+          <select class="dashboard-select" id="dashboardRangeSelect">
+            <option value="7d" ${state.dashboardRange === '7d' ? 'selected' : ''}>Last 7 days</option>
+            <option value="30d" ${state.dashboardRange === '30d' ? 'selected' : ''}>Last 30 days</option>
+            <option value="90d" ${state.dashboardRange === '90d' ? 'selected' : ''}>Last 90 days</option>
+            <option value="month" ${state.dashboardRange === 'month' ? 'selected' : ''}>Specific month</option>
+          </select>
+        </div>
+        <div id="dashboardMonthWrap" style="${state.dashboardRange === 'month' ? '' : 'display:none'}">
+          <div class="filter-label">Month</div>
+          <select class="dashboard-select" id="dashboardMonthSelect">
+            ${(filters.available_months || []).map((value) => `
+              <option value="${escHtml(value)}" ${filters.month === value ? 'selected' : ''}>${escHtml(formatMonthLabel(value))}</option>
+            `).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="dashboard-filter-group">
+        <div class="filter-chip">${escHtml(filters.range_label || '')}</div>
+        <div class="filter-chip">${overview.total_sessions.toLocaleString()} sessions in scope</div>
+      </div>
+    </section>
+
+    <section class="dashboard-hero">
+      <div class="dashboard-hero-grid">
+        <div>
+          <div class="hero-kicker">Claude Code only</div>
+          <h1 class="hero-title">Browse sessions and understand your usage without leaving your machine.</h1>
+          <div class="hero-copy">
+            Search every indexed conversation, jump back into old sessions with one click, and track tokens, model mix, activity patterns, and estimated spend from your local Claude Code history.
+          </div>
+          <div class="hero-tags">
+            ${heroTags.map((tag) => `<div class="tag">${escHtml(tag)}</div>`).join('')}
+          </div>
+        </div>
+        <div class="hero-note">
+          <h3>Cost estimate</h3>
+          <p>${escHtml(pricing.note)}</p>
+          <p>Pricing coverage: <strong>${pricing.coverage_pct}%</strong> of indexed tokens are attached to recognized Claude models.</p>
+          <p>Pricing reference checked on ${escHtml(pricing.checked_at)}.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card-grid">
+      ${renderMetricCard('Total sessions', overview.total_sessions.toLocaleString(), 'Indexed Claude Code conversation files')}
+      ${renderMetricCard('Active days', overview.active_days.toLocaleString(), 'Days with assistant activity recorded')}
+      ${renderMetricCard('Total tokens', formatTokens(overview.total_tokens), 'Assistant-side tokens across all indexed sessions')}
+      ${renderMetricCard('Unique active time', formatDuration(overview.unique_active_seconds), 'Deduplicated across overlapping sessions and based on interactive activity')}
+      ${renderMetricCard('Summed active time', formatDuration(overview.summed_active_seconds), 'Adds per-session interactive time; useful as total Claude workload')}
+      ${renderMetricCard('Avg. per active day', formatDuration(overview.avg_unique_seconds_per_active_day), 'Unique active time divided by active days in scope')}
+      ${renderMetricCard('Estimated cost', formatMoney(overview.estimated_cost_usd), 'Estimated from published Claude API token pricing')}
+      ${renderMetricCard('Avg. tokens/session', formatTokens(overview.avg_tokens_per_session), 'Average total tokens per session')}
+      ${renderMetricCard('Busiest day', escHtml(busiestDay), 'Highest unique active time on a single day in the selected range')}
+    </section>
+
+    <section class="section-grid">
+      <div class="surface-card span-8">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Daily active time</div>
+            <div class="section-subtitle">${escHtml(activeTimeSubtitle)}</div>
+          </div>
+        </div>
+        <div class="chart-shell">${renderLineChart(dashboard.daily, 'unique_active_seconds', '#D97757', formatDuration)}</div>
+        <div class="chart-caption">Unique active time deduplicates overlapping session intervals and ignores assistant-only clusters.</div>
+      </div>
+
+      <div class="surface-card span-4">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Weekday activity</div>
+            <div class="section-subtitle">Unique active time aggregated by weekday</div>
+          </div>
+        </div>
+        ${renderWeekdayActivity(dashboard.weekday_activity)}
+      </div>
+
+      <div class="surface-card span-8">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Daily tokens</div>
+            <div class="section-subtitle">${escHtml(dailySubtitle)}</div>
+          </div>
+        </div>
+        <div class="chart-shell">${renderLineChart(dashboard.daily, 'tokens', '#8bd3ff', formatTokens)}</div>
+        <div class="chart-caption">Token usage is bucketed by assistant message timestamp, not by session end date.</div>
+      </div>
+
+      <div class="surface-card span-4">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Top models</div>
+            <div class="section-subtitle">Share of total assistant tokens</div>
+          </div>
+        </div>
+        ${renderTopModels(dashboard.top_models)}
+      </div>
+
+      <div class="surface-card span-6">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Daily estimated cost</div>
+            <div class="section-subtitle">${escHtml(costSubtitle)}</div>
+          </div>
+        </div>
+        <div class="chart-shell">${renderLineChart(dashboard.daily, 'cost', '#F97316', formatMoney)}</div>
+      </div>
+
+      <div class="surface-card span-6">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Model usage over time</div>
+            <div class="section-subtitle">${escHtml(timelineSubtitle)}</div>
+          </div>
+          <div class="legend">
+            ${dashboard.top_models.slice(0, 4).map((model, index) => `
+              <span><span class="legend-swatch" style="background:${modelColor(index)}"></span>${escHtml(model.label)}</span>
+            `).join('')}
+          </div>
+        </div>
+        ${renderModelTimeline(dashboard.model_timeline)}
+      </div>
+
+      <div class="surface-card span-5">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Session size distribution</div>
+            <div class="section-subtitle">Where your Claude Code sessions cluster by total token volume</div>
+          </div>
+        </div>
+        ${renderHistogram(dashboard.session_histogram)}
+      </div>
+
+      <div class="surface-card span-7">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Usage pattern</div>
+            <div class="section-subtitle">Assistant token intensity by weekday and hour</div>
+          </div>
+        </div>
+        ${renderUsageHeatmap(dashboard.usage_heatmap)}
+      </div>
+
+      <div class="surface-card span-12">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Heaviest sessions</div>
+            <div class="section-subtitle">Open any row from the session list to inspect the full transcript and model breakdown</div>
+          </div>
+        </div>
+        ${renderSessionsTable(dashboard.top_sessions)}
+      </div>
+    </section>
+  `;
+
+  const rangeSelect = document.getElementById('dashboardRangeSelect');
+  const monthSelect = document.getElementById('dashboardMonthSelect');
+  rangeSelect?.addEventListener('change', async (event) => {
+    state.dashboardRange = event.target.value;
+    if (state.dashboardRange === 'month' && !state.dashboardMonth && filters.available_months?.length) {
+      state.dashboardMonth = filters.available_months[0];
+    }
+    persistUiState();
+    await loadDashboard();
+  });
+  monthSelect?.addEventListener('change', async (event) => {
+    state.dashboardMonth = event.target.value;
+    persistUiState();
+    await loadDashboard();
+  });
+}
+
+function renderMetricCard(label, value, caption) {
+  return `
+    <div class="metric-card">
+      <div class="metric-label">${label}</div>
+      <div class="metric-value">${value}</div>
+      <div class="metric-caption">${caption}</div>
+    </div>
+  `;
+}
+
+function renderTopModels(models) {
+  if (!models.length) {
+    return '<div class="chart-caption">No model metadata was found in the indexed sessions.</div>';
+  }
+  const max = Math.max(...models.map((item) => item.tokens), 1);
+  return `
+    <div class="bar-list">
+      ${models.map((model, index) => `
+        <div class="bar-row">
+          <div class="bar-label" title="${escHtml(model.label)}">${escHtml(model.label)}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(model.tokens / max) * 100}%; background:${modelColor(index)}"></div>
+          </div>
+          <div class="bar-value">${formatTokens(model.tokens)} · ${model.percentage}%</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderWeekdayActivity(rows) {
+  if (!rows?.length) {
+    return '<div class="chart-caption">No activity data available for this range.</div>';
+  }
+  const max = Math.max(...rows.map((item) => Number(item.seconds || 0)), 1);
+  return `
+    <div class="bar-list">
+      ${rows.map((row, index) => `
+        <div class="bar-row">
+          <div class="bar-label">${escHtml(row.label)}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(Number(row.seconds || 0) / max) * 100}%; background:${modelColor(index)}"></div>
+          </div>
+          <div class="bar-value">${formatDuration(row.seconds)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderLineChart(points, key, color, formatter) {
+  if (!points.length) {
+    return '<div class="chart-caption">No activity recorded for this range.</div>';
+  }
+
+  const width = 920;
+  const height = 260;
+  const padding = { top: 18, right: 12, bottom: 36, left: 14 };
+  const values = points.map((point) => Number(point[key] || 0));
+  const max = Math.max(...values, 1);
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  const coords = points.map((point, index) => {
+    const x = padding.left + (index / Math.max(points.length - 1, 1)) * innerWidth;
+    const y = padding.top + innerHeight - ((Number(point[key] || 0) / max) * innerHeight);
+    return { x, y, value: Number(point[key] || 0), date: point.date };
+  });
+
+  const path = coords.map((coord, index) => `${index === 0 ? 'M' : 'L'} ${coord.x.toFixed(2)} ${coord.y.toFixed(2)}`).join(' ');
+  const fillPath = `${path} L ${coords[coords.length - 1].x.toFixed(2)} ${padding.top + innerHeight} L ${coords[0].x.toFixed(2)} ${padding.top + innerHeight} Z`;
+  const yGuides = [0.25, 0.5, 0.75, 1].map((tick) => ({
+    value: max * tick,
+    y: padding.top + innerHeight - (tick * innerHeight),
+  }));
+  const step = Math.max(1, Math.floor(points.length / 6));
+  const xLabels = points.filter((_, index) => index % step === 0 || index === points.length - 1);
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="260" role="img" aria-label="${escHtml(key)} chart">
+      <defs>
+        <linearGradient id="fill-${key}" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.35"></stop>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0.02"></stop>
+        </linearGradient>
+      </defs>
+      ${yGuides.map((guide) => `
+        <g>
+          <line x1="${padding.left}" x2="${width - padding.right}" y1="${guide.y}" y2="${guide.y}" stroke="rgba(229,246,255,0.08)" stroke-dasharray="4 6"></line>
+          <text x="${width - padding.right}" y="${guide.y - 6}" text-anchor="end" fill="rgba(243,245,250,0.5)" font-size="11">${escHtml(formatter(guide.value))}</text>
+        </g>
+      `).join('')}
+      <path d="${fillPath}" fill="url(#fill-${key})"></path>
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      ${coords.map((coord) => `
+        <g>
+          <circle cx="${coord.x}" cy="${coord.y}" r="3.5" fill="${color}"></circle>
+          <title>${coord.date}: ${formatter(coord.value)}</title>
+        </g>
+      `).join('')}
+      ${xLabels.map((point) => {
+        const index = points.findIndex((entry) => entry.date === point.date);
+        const x = padding.left + (index / Math.max(points.length - 1, 1)) * innerWidth;
+        return `<text x="${x}" y="${height - 10}" fill="rgba(243,245,250,0.5)" font-size="11" text-anchor="middle">${new Date(point.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</text>`;
+      }).join('')}
+    </svg>
+  `;
+}
+
+function renderModelTimeline(entries) {
+  if (!entries.length) {
+    return '<div class="chart-caption">No model activity recorded for this range.</div>';
+  }
+  const dailyTotals = entries.map((entry) => entry.models.reduce((sum, model) => sum + Number(model.tokens || 0), 0));
+  const max = Math.max(...dailyTotals, 1);
+
+  return `
+    <div class="timeline-bars">
+      ${entries.map((entry) => {
+        const total = entry.models.reduce((sum, model) => sum + Number(model.tokens || 0), 0);
+        const dateLabel = new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const segments = entry.models.map((model, index) => {
+          const pct = total ? (Number(model.tokens || 0) / total) * 100 : 0;
+          return `<div class="timeline-segment" style="height:${pct}%; background:${model.model === 'other' ? '#6b7280' : modelColor(index)}" title="${escHtml(model.label)}: ${formatTokens(model.tokens)}"></div>`;
+        }).join('');
+        return `
+          <div class="timeline-day">
+            <div class="timeline-stack" title="${escHtml(dateLabel)} · ${formatTokens(total)} tokens" style="height:${Math.max(16, (total / max) * 200)}px">${segments}</div>
+            <div class="timeline-label">${escHtml(dateLabel)}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderHistogram(buckets) {
+  if (!buckets.length) {
+    return '<div class="chart-caption">No session size data available.</div>';
+  }
+  const max = Math.max(...buckets.map((bucket) => bucket.count), 1);
+  return `
+    <div class="histogram">
+      ${buckets.map((bucket) => `
+        <div class="histogram-bar">
+          <div class="histogram-value">${bucket.count}</div>
+          <div class="histogram-fill" style="height:${Math.max(4, (bucket.count / max) * 150)}px"></div>
+          <div class="histogram-label">${escHtml(bucket.label)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderUsageHeatmap(payload) {
+  const cells = payload?.cells || [];
+  const max = payload?.max_tokens || 1;
+  const map = new Map(cells.map((cell) => [`${cell.weekday}-${cell.hour}`, cell]));
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const hours = Array.from({ length: 24 }, (_, hour) => hour);
+  let html = '<div class="heatmap-grid">';
+  html += '<div></div>';
+  html += hours.map((hour) => `<div class="heatmap-hour">${String(hour).padStart(2, '0')}</div>`).join('');
+  weekdays.forEach((day, weekdayIndex) => {
+    html += `<div class="heatmap-day">${day}</div>`;
+    hours.forEach((hour) => {
+      const cell = map.get(`${weekdayIndex}-${hour}`) || { tokens: 0, assistant_messages: 0 };
+      const intensity = cell.tokens === 0 ? 0 : Math.max(0.12, cell.tokens / max);
+      const background = cell.tokens === 0
+        ? 'rgba(229,246,255,0.05)'
+        : `rgba(249, 115, 22, ${Math.min(1, intensity * 0.92)})`;
+      html += `<div class="heatmap-cell" title="${day} ${String(hour).padStart(2, '0')}:00 · ${formatTokens(cell.tokens)} tokens · ${cell.assistant_messages} assistant messages" style="background:${background}"></div>`;
+    });
+  });
+  html += '</div>';
+  html += `
+    <div class="heatmap-legend">
+      <span>Lower activity</span>
+      <span class="legend-swatch" style="background:rgba(229,246,255,0.12)"></span>
+      <span class="legend-swatch" style="background:rgba(249,115,22,0.45)"></span>
+      <span class="legend-swatch" style="background:rgba(249,115,22,0.92)"></span>
+      <span>Higher activity</span>
+    </div>
+  `;
+  return html;
+}
+
+function renderSessionsTable(rows) {
+  if (!rows.length) {
+    return '<div class="chart-caption">No session data available.</div>';
+  }
+  return `
+    <div class="table-shell">
+      <table>
+        <thead>
+          <tr>
+            <th>Session</th>
+            <th>Project</th>
+            <th>Last activity</th>
+            <th>Est. time</th>
+            <th>Tokens</th>
+            <th>Estimated cost</th>
+            <th>Model mix</th>
+            <th>Session ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr>
+              <td>
+                <div class="table-title">${escHtml(row.title || '(untitled)')}</div>
+                <div class="table-secondary">${Number(row.message_count || 0).toLocaleString()} messages · ${escHtml(formatDate(row.created_at))}</div>
+              </td>
+              <td><div class="table-project">${escHtml(relativeProjectName(row.project_path))}</div></td>
+              <td>${escHtml(formatDate(row.last_message_at || row.updated_at || row.last_message))}</td>
+              <td>${escHtml(formatDuration(row.estimated_active_seconds))}</td>
+              <td>${formatTokens(row.total_tokens)}</td>
+              <td>${formatMoney(row.estimated_cost_usd)}</td>
+              <td>${escHtml(row.model_display || 'Unknown')}</td>
+              <td><code>${escHtml(shortSessionId(row.session_id))}</code></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderConversationDetail() {
+  const detail = state.selectedConversationDetail;
+  if (!detail || !detail.conversation) {
+    renderDashboard();
+    return;
+  }
+
+  const conversation = detail.conversation;
+  const detailPreview = getDetailPreview(detail);
+  const actions = `
+    <button class="toolbar-btn" onclick="state.view='dashboard'; state.selectedConversationId=null; state.selectedConversationDetail=null; renderConversationList(); renderMainPanel(); document.getElementById('overviewBtn').classList.add('active');">Back to overview</button>
+    <button class="toolbar-btn primary" onclick="openInTerminal('${escHtml(conversation.session_id)}', ${JSON.stringify(conversation.cwd || '')})">Resume</button>
+    <button class="toolbar-btn" onclick="openInTerminal('${escHtml(conversation.session_id)}', ${JSON.stringify(conversation.cwd || '')}, 'terminal')">Terminal</button>
+    <button class="toolbar-btn" onclick="openInTerminal('${escHtml(conversation.session_id)}', ${JSON.stringify(conversation.cwd || '')}, 'vscode')">VS Code</button>
+    <button class="toolbar-btn" onclick="exportConversation('${escHtml(conversation.session_id)}', 'markdown')">Export</button>
+  `;
+  setMainHeader(conversation.title || '(untitled)', relativeProjectName(conversation.project_path), actions);
+  document.getElementById('overviewBtn').classList.remove('active');
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="detail-header">
+      <div class="hero-kicker">Session detail</div>
+      <div class="hero-title" style="font-size:32px">${escHtml(conversation.title || '(untitled)')}</div>
+      <div class="hero-copy" id="detailPreview">${escHtml(detailPreview)}</div>
+      <div class="detail-meta">
+        <div class="meta-chip">${escHtml(relativeProjectName(conversation.project_path))}</div>
+        <div class="meta-chip">${escHtml(formatDateTime(conversation.last_message_at || conversation.last_message))}</div>
+        <div class="meta-chip">${escHtml(conversation.model_display || 'Unknown model')}</div>
+        <div class="meta-chip">Session ${escHtml(shortSessionId(conversation.session_id))}</div>
+      </div>
+      <div class="manual-resume">
+        <div class="manual-resume-label">Manual resume command</div>
+        <code>${escHtml(conversation.resume_command || `claude -r ${conversation.session_id}`)}</code>
+      </div>
+      <div class="detail-grid">
+        ${renderDetailStat('Total tokens', formatTokens(conversation.total_tokens))}
+        ${renderDetailStat('Est. active time', formatDuration(conversation.estimated_active_seconds))}
+        ${renderDetailStat('Estimated cost', formatMoney(conversation.estimated_cost_usd))}
+        ${renderDetailStat('Messages', Number(conversation.message_count || 0).toLocaleString())}
+        ${renderDetailStat('Model count', Number(conversation.model_count || 0).toLocaleString())}
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="surface-card span-5">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Token mix</div>
+            <div class="section-subtitle">Assistant-side token categories for this session</div>
+          </div>
+        </div>
+        <div class="bar-list">
+          ${[
+            ['Input tokens', conversation.input_tokens, '#8bd3ff'],
+            ['Output tokens', conversation.output_tokens, '#F97316'],
+            ['Cache write tokens', conversation.cache_creation_input_tokens, '#D97757'],
+            ['Cache read tokens', conversation.cache_read_input_tokens, '#f4b942'],
+          ].map(([label, value, color]) => {
+            const total = Math.max(conversation.total_tokens || 1, 1);
+            return `
+              <div class="bar-row">
+                <div class="bar-label">${label}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:${(Number(value || 0) / total) * 100}%; background:${color}"></div></div>
+                <div class="bar-value">${formatTokens(value)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <div class="surface-card span-7">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Model breakdown</div>
+            <div class="section-subtitle">Per-model share of tokens and estimated spend inside this session</div>
+          </div>
+        </div>
+        ${renderSessionModels(detail.model_breakdown)}
+      </div>
+
+      <div class="surface-card span-12">
+        <div class="section-heading">
+          <div>
+            <div class="section-title">Transcript</div>
+            <div class="section-subtitle">Rendered from the indexed Claude Code JSONL messages. Newest-first makes the latest message immediately visible.</div>
+          </div>
+          <div>
+            <select class="dashboard-select" id="transcriptOrderSelect">
+              <option value="newest" ${state.transcriptOrder === 'newest' ? 'selected' : ''}>Newest first</option>
+              <option value="oldest" ${state.transcriptOrder === 'oldest' ? 'selected' : ''}>Oldest first</option>
+            </select>
+          </div>
+        </div>
+        <div class="transcript">
+          ${detail.messages.map(renderMessageCard).join('')}
+        </div>
+      </div>
+    </section>
+  `;
+
+  document.getElementById('transcriptOrderSelect')?.addEventListener('change', (event) => {
+    state.transcriptOrder = event.target.value;
+    persistUiState();
+    applyTranscriptOrder();
+  });
+  applyTranscriptOrder();
+  document.getElementById('mainContent').querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+}
+
+function applyTranscriptOrder() {
+  const transcript = document.querySelector('.transcript');
+  if (!transcript) return;
+  transcript.classList.toggle('reverse', state.transcriptOrder === 'newest');
+  updateDetailPreview();
+}
+
+function cleanPreviewText(text, fallback = 'No preview available for this session.') {
+  const normalized = String(text || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) return fallback;
+  return normalized.length > 240 ? `${normalized.slice(0, 237).trim()}...` : normalized;
+}
+
+function getDetailPreview(detail) {
+  const messages = Array.isArray(detail?.messages) ? detail.messages : [];
+  const nonEmptyMessages = messages.filter((message) => String(message?.content || '').trim());
+  if (!nonEmptyMessages.length) {
+    return cleanPreviewText(detail?.conversation?.excerpt);
+  }
+  const source = state.transcriptOrder === 'newest'
+    ? nonEmptyMessages[nonEmptyMessages.length - 1]
+    : nonEmptyMessages[0];
+  return cleanPreviewText(source?.content, cleanPreviewText(detail?.conversation?.excerpt));
+}
+
+function updateDetailPreview() {
+  const preview = document.getElementById('detailPreview');
+  if (!preview || !state.selectedConversationDetail) return;
+  preview.textContent = getDetailPreview(state.selectedConversationDetail);
+}
+
+function renderDetailStat(label, value) {
+  return `
+    <div class="detail-stat">
+      <div class="metric-label">${label}</div>
+      <div class="value">${value}</div>
+    </div>
+  `;
+}
+
+function renderSessionModels(models) {
+  if (!models.length) {
+    return '<div class="chart-caption">No assistant model metadata found for this session.</div>';
+  }
+  const max = Math.max(...models.map((item) => item.tokens), 1);
+  return `
+    <div class="bar-list">
+      ${models.map((model, index) => `
+        <div class="bar-row">
+          <div class="bar-label">${escHtml(model.label)}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(model.tokens / max) * 100}%; background:${modelColor(index)}"></div>
+          </div>
+          <div class="bar-value">${formatTokens(model.tokens)} · ${formatMoney(model.estimated_cost_usd)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderMessageCard(message) {
+  const role = message.role === 'user' ? 'You' : 'Claude';
+  const model = message.model ? message.model : null;
+  const body = message.content ? marked.parse(message.content) : '<p><em>Empty message</em></p>';
+  return `
+    <article class="message-card ${escHtml(message.role)}">
+      <div class="message-header">
+        <div class="message-role">${escHtml(role)}</div>
+        <div class="message-meta">
+          <span>${escHtml(formatDateTime(message.timestamp))}</span>
+          ${message.token_count ? `<span>${formatTokens(message.token_count)} tokens</span>` : ''}
+          ${model ? `<span>${escHtml(model)}</span>` : ''}
+          ${message.estimated_cost_usd ? `<span>${formatMoney(message.estimated_cost_usd)}</span>` : ''}
+        </div>
+      </div>
+      <div class="message-body markdown-render">${body}</div>
+    </article>
+  `;
+}
+
+function renderLoadingState() {
+  return `
+    <div class="empty-state">
+      <div class="empty-shell">
+        <div class="empty-icon">…</div>
+        <div class="empty-title">Loading</div>
+        <div class="empty-copy">Reading your local Claude Code session index.</div>
+      </div>
+    </div>
+  `;
+}
+
+function terminalLabel(terminal) {
+  if (terminal === 'terminal') return 'Terminal';
+  if (terminal === 'vscode') return 'VS Code';
+  return 'resume command';
+}
+
+async function openInTerminal(sessionId, cwd, terminal = null) {
+  const result = await callApi('open_in_terminal', sessionId, cwd || '', terminal);
+  if (!result.ok) {
+    showToast(result.error || 'Failed to open terminal session');
+    return;
+  }
+  showToast(`Opened Claude ${terminalLabel(terminal)}`, 'success');
+}
+
+async function exportConversation(sessionId, format) {
+  const result = await callApi('export_conversation', sessionId, format);
+  if (!result.ok) {
+    showToast(result.error || 'Export failed');
+    return;
+  }
+
+  const blob = new Blob([result.content], { type: format === 'json' ? 'application/json' : 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = result.filename;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('Conversation exported', 'success');
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    await callApi('copy_to_clipboard', text);
   }
 }
 
-function showToast(message, type = 'error') {
-  const existing = document.querySelector('.toast');
-  if (existing) existing.remove();
+function toggleFilePanel() {
+  state.filePanelOpen = !state.filePanelOpen;
+  document.getElementById('filePanel').classList.toggle('open', state.filePanelOpen);
+  document.getElementById('filesBtn').classList.toggle('active', state.filePanelOpen);
+  document.documentElement.style.setProperty('--file-width', state.filePanelOpen ? '370px' : '0px');
+  document.documentElement.style.setProperty('--file-handle-width', state.filePanelOpen ? '6px' : '0px');
+  document.getElementById('fileResizeHandle').classList.toggle('hidden', !state.filePanelOpen);
+  if (state.filePanelOpen && !state.fileTree) {
+    loadFileTree();
+  }
+}
+
+async function loadFileTree() {
+  document.getElementById('fileTree').innerHTML = '<div class="chart-caption">Loading file tree...</div>';
+  const tree = await callApi('get_file_tree');
+  state.fileTree = tree;
+  renderFileTree();
+  document.getElementById('filePreview').innerHTML = `
+    <div class="file-preview-shell">
+      <div class="chart-caption">Select a file to preview it here.</div>
+    </div>
+  `;
+}
+
+function renderFileTree() {
+  const container = document.getElementById('fileTree');
+  if (!state.fileTree || !state.fileTree.children) {
+    container.innerHTML = '<div class="chart-caption">No file tree available.</div>';
+    return;
+  }
+  container.innerHTML = renderFileTreeNode(state.fileTree, 0);
+  container.querySelectorAll('.tree-item[data-type="file"]').forEach((element) => {
+    element.addEventListener('click', () => loadFilePreview(element.dataset.path));
+  });
+}
+
+function renderFileTreeNode(node, depth) {
+  if (!node) return '';
+  if (node.type === 'file') {
+    const active = state.selectedFilePath === node.path ? 'active' : '';
+    return `
+      <div class="tree-item ${active}" data-type="file" data-path="${escHtml(node.path)}">
+        <span class="tree-indent" style="margin-left:${depth * 12}px"></span>
+        <span>📄</span>
+        <span>${escHtml(node.name)}</span>
+      </div>
+    `;
+  }
+
+  const children = (node.children || []).map((child) => renderFileTreeNode(child, depth + 1)).join('');
+  return `
+    <div class="tree-item" data-type="dir">
+      <span class="tree-indent" style="margin-left:${depth * 12}px"></span>
+      <span>📁</span>
+      <span>${escHtml(node.name)}</span>
+    </div>
+    ${children}
+  `;
+}
+
+async function loadFilePreview(path) {
+  state.selectedFilePath = path;
+  renderFileTree();
+  const result = await callApi('read_file', path);
+  if (result.type === 'image') {
+    document.getElementById('filePreview').innerHTML = `
+      <div class="file-preview-shell"><img src="${result.content}" alt="${escHtml(path)}" style="max-width:100%; border-radius:12px;"></div>
+    `;
+    return;
+  }
+  if (result.type === 'svg') {
+    document.getElementById('filePreview').innerHTML = `<div class="file-preview-shell">${result.content}</div>`;
+    return;
+  }
+  if (result.type === 'text') {
+    const code = escHtml(result.content);
+    document.getElementById('filePreview').innerHTML = `
+      <div class="file-preview-shell">
+        <pre><code class="language-${escHtml(result.language || 'plaintext')}">${code}</code></pre>
+      </div>
+    `;
+    document.getElementById('filePreview').querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+    return;
+  }
+  document.getElementById('filePreview').innerHTML = `
+    <div class="file-preview-shell"><div class="chart-caption">${escHtml(result.content || 'Unable to preview file.')}</div></div>
+  `;
+}
+
+async function reindexData() {
+  showToast('Reindexing Claude Code sessions...');
+  const result = await callApi('reindex', false);
+  if (!result.ok) {
+    showToast(result.error || 'Reindex failed');
+    return;
+  }
+  await Promise.all([
+    loadProjects(),
+    loadConversations(),
+    loadDashboard(),
+    updateStatusbar(),
+  ]);
+  showToast('Index refreshed', 'success');
+}
+
+function showToast(message, variant = '') {
   const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
+  toast.className = `toast ${variant}`.trim();
   toast.textContent = message;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3500);
+  setTimeout(() => toast.remove(), 3400);
 }
 
-// ── Stats ─────────────────────────────────────────────
-async function loadStats() {
-  const stats = await api('get_stats');
-  document.getElementById('statusTotal').textContent =
-    `${stats.total_conversations} conversations \u00b7 ${stats.total_messages} messages \u00b7 ${formatTokens(stats.total_tokens)} tokens`;
-  document.getElementById('statusIndexed').textContent =
-    `Indexed: ${stats.last_indexed} \u00b7 ${stats.db_size_mb} MB`;
+function formatMonthLabel(monthStr) {
+  if (!monthStr) return '';
+  const [year, month] = monthStr.split('-').map(Number);
+  if (!year || !month) return monthStr;
+  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
-// ── Search ────────────────────────────────────────────
-let searchTimeout;
-document.getElementById('searchInput').addEventListener('input', (e) => {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => {
-    state.searchQuery = e.target.value.trim();
-    loadConversations();
-  }, 300);
-});
-
-document.getElementById('sortSelect').addEventListener('change', (e) => {
-  state.sort = e.target.value;
-  loadConversations();
-});
-
-document.getElementById('reindexBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('reindexBtn');
-  btn.textContent = 'Indexing...';
-  btn.disabled = true;
-  await api('reindex');
-  await loadProjects();
-  await loadConversations();
-  await loadStats();
-  btn.textContent = '\u21bb Index';
-  btn.disabled = false;
-});
-
-// ── Keyboard shortcuts ────────────────────────────────
-document.addEventListener('keydown', (e) => {
-  // Cmd+F → focus search
-  if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-    e.preventDefault();
-    document.getElementById('searchInput').focus();
-  }
-  // Escape → clear search
-  if (e.key === 'Escape') {
-    document.getElementById('searchInput').value = '';
-    state.searchQuery = '';
-    loadConversations();
-  }
-});
-
-// ── Helpers ───────────────────────────────────────────
-function escHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function applyPanelWidths() {
+  document.documentElement.style.setProperty('--sidebar-width', '250px');
+  document.documentElement.style.setProperty('--list-width', '430px');
+  document.documentElement.style.setProperty('--file-width', state.filePanelOpen ? '370px' : '0px');
+  document.documentElement.style.setProperty('--file-handle-width', state.filePanelOpen ? '6px' : '0px');
 }
 
-function escAttr(str) {
-  if (!str) return '';
-  return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
-}
+function bindResizeHandles() {
+  const handles = document.querySelectorAll('.resize-handle[data-resize]');
+  handles.forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => {
+      if (handle.classList.contains('hidden')) return;
+      const type = handle.dataset.resize;
+      const startX = event.clientX;
+      const rootStyles = getComputedStyle(document.documentElement);
+      const startSidebar = parseFloat(rootStyles.getPropertyValue('--sidebar-width'));
+      const startList = parseFloat(rootStyles.getPropertyValue('--list-width'));
+      const startFile = parseFloat(rootStyles.getPropertyValue('--file-width')) || 0;
+      handle.classList.add('active');
+      handle.setPointerCapture(event.pointerId);
 
-function renderMarkdown(text) {
-  if (!text) return '';
-  try {
-    return marked.parse(text);
-  } catch {
-    return escHtml(text);
-  }
-}
+      const onMove = (moveEvent) => {
+        const delta = moveEvent.clientX - startX;
+        if (type === 'sidebar') {
+          const value = Math.min(420, Math.max(180, startSidebar + delta));
+          document.documentElement.style.setProperty('--sidebar-width', `${value}px`);
+        } else if (type === 'list') {
+          const value = Math.min(680, Math.max(280, startList + delta));
+          document.documentElement.style.setProperty('--list-width', `${value}px`);
+        } else if (type === 'file') {
+          const value = Math.min(560, Math.max(240, startFile - delta));
+          document.documentElement.style.setProperty('--file-width', `${value}px`);
+        }
+      };
 
-function formatDate(ts) {
-  if (!ts) return '?';
-  const d = new Date(ts);
-  const months = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'];
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-}
+      const onEnd = () => {
+        handle.classList.remove('active');
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onEnd);
+        handle.removeEventListener('pointercancel', onEnd);
+      };
 
-function formatTime(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-}
-
-function formatTokens(n) {
-  if (!n) return '0';
-  if (n >= 1e9) return `${(n/1e9).toFixed(1)}B`;
-  if (n >= 1e6) return `${(n/1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `${(n/1e3).toFixed(0)}K`;
-  return n.toString();
-}
-
-// ── Resizable Columns ─────────────────────────────────
-(function() {
-  const handles = document.querySelectorAll('.resize-handle');
-  let activeHandle = null;
-  let startX = 0;
-  let startWidth = 0;
-  let targetEl = null;
-
-  handles.forEach(handle => {
-    handle.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      activeHandle = handle;
-      activeHandle.classList.add('active');
-      startX = e.clientX;
-
-      const target = handle.dataset.resize;
-      if (target === 'sidebar') {
-        targetEl = document.getElementById('sidebar');
-      } else if (target === 'conversations') {
-        targetEl = document.getElementById('conversationsPanel');
-      } else if (target === 'filePanel') {
-        targetEl = document.getElementById('filePanel');
-      }
-      startWidth = targetEl.offsetWidth;
-
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onEnd);
+      handle.addEventListener('pointercancel', onEnd);
     });
   });
+}
 
-  document.addEventListener('mousemove', (e) => {
-    if (!activeHandle || !targetEl) return;
-    const dx = e.clientX - startX;
-    const isRightPanel = activeHandle.dataset.resize === 'filePanel';
-    const delta = isRightPanel ? -dx : dx;  // Right panel: drag left = wider
-    const newWidth = Math.max(
-      parseInt(getComputedStyle(targetEl).minWidth) || 140,
-      Math.min(startWidth + delta, parseInt(getComputedStyle(targetEl).maxWidth) || 700)
-    );
-    targetEl.style.width = newWidth + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (activeHandle) {
-      activeHandle.classList.remove('active');
-      activeHandle = null;
-      targetEl = null;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-  });
-})();
+window.addEventListener('pywebviewready', init);
+if (window.pywebview) {
+  init();
+}
 </script>
 </body>
 </html>

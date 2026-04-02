@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Claude Code Conversation Indexer
+Claude Code Session Indexer
 Parses JSONL conversation files and builds a SQLite index with FTS5 search.
 """
 
+import argparse
+from collections import Counter
 import json
 import os
 import re
@@ -12,7 +14,10 @@ import sys
 from glob import glob
 from pathlib import Path
 
-from config import CLAUDE_DIR, PROJECTS_DIR, DB_PATH, get_config
+from claude_models import estimate_message_cost_usd, normalize_model_name, summarize_models
+from config import DB_PATH, get_config, get_projects_dir
+
+CURRENT_SCHEMA_VERSION = 2
 
 
 def get_project_dirs():
@@ -20,17 +25,18 @@ def get_project_dirs():
     config = get_config()
     filters = config.get("project_filters", [])
     skip = set(config.get("skip_subdirs", []))
+    projects_dir = get_projects_dir(config)
 
     if filters:
         dirs = set()
         for pf in filters:
-            pattern = str(PROJECTS_DIR / f"*{pf}*")
+            pattern = str(projects_dir / f"*{pf}*")
             dirs.update(glob(pattern))
     else:
         # No filters = scan ALL projects
         dirs = set()
-        if PROJECTS_DIR.exists():
-            for d in PROJECTS_DIR.iterdir():
+        if projects_dir.exists():
+            for d in projects_dir.iterdir():
                 if d.is_dir() and d.name not in skip:
                     dirs.add(str(d))
 
@@ -79,12 +85,12 @@ def generate_title(first_prompt: str) -> str:
     if not first_prompt:
         return "(empty)"
 
-    text = first_prompt.strip()
-    text = re.sub(r'<[^>]+>', '', text).strip()
+    raw_text = re.sub(r'<[^>]+>', '', first_prompt.strip()).strip()
+    text = re.sub(r"\s+", " ", raw_text).strip()
 
     # For "Implement the following plan:" prompts, extract the plan title
     if text.startswith("Implement the following plan:"):
-        heading_match = re.search(r'^#\s+(.+)$', text, re.MULTILINE)
+        heading_match = re.search(r'^#\s+(.+)$', raw_text, re.MULTILINE)
         if heading_match:
             plan_title = heading_match.group(1).strip()
             plan_title = re.sub(r'^Plan:\s*', '', plan_title)
@@ -93,13 +99,17 @@ def generate_title(first_prompt: str) -> str:
             return plan_title[:57] + "..."
 
     # For skill invocations
-    if "Base directory for this skill:" in text:
-        skill_match = re.search(r'#\s+(.+)', text)
+    if "Base directory for this skill:" in raw_text:
+        skill_match = re.search(r'^\s*#\s+(.+)$', raw_text, re.MULTILINE)
         if skill_match:
             return skill_match.group(1).strip()[:60]
 
+    if text.lower().startswith("caveat:"):
+        return "(session bootstrap)"
+
     if text.startswith("/"):
-        return text[:60]
+        command = text.split()[0]
+        return command[:60]
 
     if len(text.split()) <= 3:
         return text[:60]
@@ -121,11 +131,19 @@ def parse_jsonl_file(filepath: str) -> dict | None:
     messages = []
     user_prompts = []
     total_tokens = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
+    total_cache_creation_tokens = 0
+    total_cache_read_tokens = 0
+    estimated_cost_usd = 0.0
+    priced_tokens = 0
+    unpriced_tokens = 0
     first_timestamp = None
     last_timestamp = None
     slug = None
     cwd = None
     version = None
+    model_totals: Counter[str] = Counter()
 
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -159,10 +177,12 @@ def parse_jsonl_file(filepath: str) -> dict | None:
                     content = extract_text_content(msg.get("content", ""))
                     is_real_prompt = (
                         content
+                        and "<local-command-caveat>" not in content
                         and not content.startswith("The user doesn't want to proceed")
                         and not content.startswith("Caveat:")
                         and not content.startswith("Note:")
                         and not content.startswith("[Request interrupted")
+                        and not content.startswith("<command-name>/clear</command-name>")
                         and record.get("userType") != "internal"
                     )
                     if is_real_prompt:
@@ -172,6 +192,12 @@ def parse_jsonl_file(filepath: str) -> dict | None:
                         "content": content,
                         "timestamp": timestamp,
                         "token_count": 0,
+                        "model": "",
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 0,
+                        "estimated_cost_usd": 0.0,
                     })
 
                 elif record_type == "assistant":
@@ -183,7 +209,21 @@ def parse_jsonl_file(filepath: str) -> dict | None:
                     cache_creation = usage.get("cache_creation_input_tokens", 0)
                     cache_read = usage.get("cache_read_input_tokens", 0)
                     msg_tokens = input_tokens + output_tokens + cache_creation + cache_read
+                    model = normalize_model_name(msg.get("model"))
+                    msg_cost_usd, was_priced = estimate_message_cost_usd(model, usage)
+
                     total_tokens += msg_tokens
+                    total_input_tokens += input_tokens
+                    total_output_tokens += output_tokens
+                    total_cache_creation_tokens += cache_creation
+                    total_cache_read_tokens += cache_read
+                    estimated_cost_usd += msg_cost_usd
+                    if was_priced:
+                        priced_tokens += msg_tokens
+                    else:
+                        unpriced_tokens += msg_tokens
+                    if model:
+                        model_totals[model] += msg_tokens
 
                     if content:
                         messages.append({
@@ -191,6 +231,12 @@ def parse_jsonl_file(filepath: str) -> dict | None:
                             "content": content,
                             "timestamp": timestamp,
                             "token_count": msg_tokens,
+                            "model": model,
+                            "input_tokens": input_tokens,
+                            "output_tokens": output_tokens,
+                            "cache_creation_input_tokens": cache_creation,
+                            "cache_read_input_tokens": cache_read,
+                            "estimated_cost_usd": msg_cost_usd,
                         })
 
     except Exception as e:
@@ -210,6 +256,7 @@ def parse_jsonl_file(filepath: str) -> dict | None:
             truncated += "..."
         excerpt_parts.append(truncated)
     excerpt = "\n---\n".join(excerpt_parts)
+    model_summary = summarize_models(dict(model_totals))
 
     return {
         "session_id": session_id,
@@ -221,8 +268,16 @@ def parse_jsonl_file(filepath: str) -> dict | None:
         "message_count": len(messages),
         "user_message_count": len(user_prompts),
         "total_tokens": total_tokens,
+        "input_tokens": total_input_tokens,
+        "output_tokens": total_output_tokens,
+        "cache_creation_input_tokens": total_cache_creation_tokens,
+        "cache_read_input_tokens": total_cache_read_tokens,
+        "estimated_cost_usd": round(estimated_cost_usd, 6),
+        "priced_tokens": priced_tokens,
+        "unpriced_tokens": unpriced_tokens,
         "cwd": cwd or "",
         "version": version or "",
+        **model_summary,
         "messages": messages,
     }
 
@@ -245,10 +300,22 @@ def init_db(db_path: str) -> sqlite3.Connection:
             message_count INTEGER DEFAULT 0,
             user_message_count INTEGER DEFAULT 0,
             total_tokens INTEGER DEFAULT 0,
+            input_tokens INTEGER DEFAULT 0,
+            output_tokens INTEGER DEFAULT 0,
+            cache_creation_input_tokens INTEGER DEFAULT 0,
+            cache_read_input_tokens INTEGER DEFAULT 0,
+            estimated_cost_usd REAL DEFAULT 0,
+            priced_tokens INTEGER DEFAULT 0,
+            unpriced_tokens INTEGER DEFAULT 0,
             cwd TEXT,
             version TEXT,
+            primary_model TEXT,
+            model_count INTEGER DEFAULT 0,
+            model_display TEXT,
+            models_json TEXT,
             file_path TEXT,
             file_mtime REAL,
+            schema_version INTEGER DEFAULT 1,
             indexed_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -259,6 +326,12 @@ def init_db(db_path: str) -> sqlite3.Connection:
             content TEXT,
             timestamp TEXT,
             token_count INTEGER DEFAULT 0,
+            model TEXT,
+            input_tokens INTEGER DEFAULT 0,
+            output_tokens INTEGER DEFAULT 0,
+            cache_creation_input_tokens INTEGER DEFAULT 0,
+            cache_read_input_tokens INTEGER DEFAULT 0,
+            estimated_cost_usd REAL DEFAULT 0,
             embedding BLOB,
             FOREIGN KEY (session_id) REFERENCES conversations(session_id) ON DELETE CASCADE
         );
@@ -304,8 +377,53 @@ def init_db(db_path: str) -> sqlite3.Connection:
         END;
     """)
 
+    _ensure_columns(
+        conn,
+        "conversations",
+        {
+            "input_tokens": "INTEGER DEFAULT 0",
+            "output_tokens": "INTEGER DEFAULT 0",
+            "cache_creation_input_tokens": "INTEGER DEFAULT 0",
+            "cache_read_input_tokens": "INTEGER DEFAULT 0",
+            "estimated_cost_usd": "REAL DEFAULT 0",
+            "priced_tokens": "INTEGER DEFAULT 0",
+            "unpriced_tokens": "INTEGER DEFAULT 0",
+            "primary_model": "TEXT",
+            "model_count": "INTEGER DEFAULT 0",
+            "model_display": "TEXT",
+            "models_json": "TEXT",
+            "schema_version": "INTEGER DEFAULT 1",
+        },
+    )
+    _ensure_columns(
+        conn,
+        "messages",
+        {
+            "model": "TEXT",
+            "input_tokens": "INTEGER DEFAULT 0",
+            "output_tokens": "INTEGER DEFAULT 0",
+            "cache_creation_input_tokens": "INTEGER DEFAULT 0",
+            "cache_read_input_tokens": "INTEGER DEFAULT 0",
+            "estimated_cost_usd": "REAL DEFAULT 0",
+        },
+    )
+    conn.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_messages_model ON messages(model);
+    """)
+
     conn.commit()
     return conn
+
+
+def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    existing = {
+        row[1]
+        for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    for name, ddl in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
 def index_conversation(conn: sqlite3.Connection, fallback_project_path: str, filepath: str, force: bool = False) -> bool:
@@ -315,10 +433,10 @@ def index_conversation(conn: sqlite3.Connection, fallback_project_path: str, fil
 
     if not force:
         row = conn.execute(
-            "SELECT file_mtime FROM conversations WHERE session_id = ?",
+            "SELECT file_mtime, schema_version, model_display FROM conversations WHERE session_id = ?",
             (session_id,)
         ).fetchone()
-        if row and row[0] == file_mtime:
+        if row and row[0] == file_mtime and int(row[1] or 1) >= CURRENT_SCHEMA_VERSION and row[2]:
             return False
 
     data = parse_jsonl_file(filepath)
@@ -333,23 +451,47 @@ def index_conversation(conn: sqlite3.Connection, fallback_project_path: str, fil
     conn.execute("""
         INSERT INTO conversations (session_id, project_path, slug, title, excerpt,
             first_message, last_message, message_count, user_message_count,
-            total_tokens, cwd, version, file_path, file_mtime)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            total_tokens, input_tokens, output_tokens, cache_creation_input_tokens,
+            cache_read_input_tokens, estimated_cost_usd, priced_tokens, unpriced_tokens,
+            cwd, version, primary_model, model_count, model_display, models_json,
+            file_path, file_mtime, schema_version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         session_id, project_path, data["slug"], data["title"], data["excerpt"],
         data["first_message"], data["last_message"], data["message_count"],
-        data["user_message_count"], data["total_tokens"], data["cwd"],
-        data["version"], filepath, file_mtime,
+        data["user_message_count"], data["total_tokens"], data["input_tokens"],
+        data["output_tokens"], data["cache_creation_input_tokens"],
+        data["cache_read_input_tokens"], data["estimated_cost_usd"],
+        data["priced_tokens"], data["unpriced_tokens"], data["cwd"],
+        data["version"], data["primary_model"], data["model_count"],
+        data["model_display"], data["models_json"], filepath, file_mtime,
+        CURRENT_SCHEMA_VERSION,
     ))
 
     msg_rows = [
-        (session_id, m["role"], m["content"], m["timestamp"], m["token_count"])
+        (
+            session_id,
+            m["role"],
+            m["content"],
+            m["timestamp"],
+            m["token_count"],
+            m["model"],
+            m["input_tokens"],
+            m["output_tokens"],
+            m["cache_creation_input_tokens"],
+            m["cache_read_input_tokens"],
+            m["estimated_cost_usd"],
+        )
         for m in data["messages"]
         if m["content"]
     ]
     conn.executemany("""
-        INSERT INTO messages (session_id, role, content, timestamp, token_count)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO messages (
+            session_id, role, content, timestamp, token_count, model,
+            input_tokens, output_tokens, cache_creation_input_tokens,
+            cache_read_input_tokens, estimated_cost_usd
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, msg_rows)
 
     return True
@@ -359,9 +501,11 @@ def run_index(force: bool = False):
     """Run the full indexing process."""
     config = get_config()
     filters = config.get("project_filters", [])
+    projects_dir = get_projects_dir(config)
 
-    print("Claude Conversation Indexer")
+    print("Claude Code Session Indexer")
     print(f"Database: {DB_PATH}")
+    print(f"Source:   {projects_dir}")
     print(f"Scope: {'all projects' if not filters else ', '.join(filters)}")
     print()
 
@@ -421,6 +565,12 @@ def run_index(force: bool = False):
     conn.close()
 
 
+def main(argv: list[str] | None = None):
+    parser = argparse.ArgumentParser(description="Index Claude Code sessions into SQLite.")
+    parser.add_argument("--force", action="store_true", help="Rebuild every session even if files are unchanged.")
+    args = parser.parse_args(argv)
+    run_index(force=args.force)
+
+
 if __name__ == "__main__":
-    force = "--force" in sys.argv
-    run_index(force=force)
+    main()

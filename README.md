@@ -1,116 +1,249 @@
-# Claude Conversation Manager
+# Claude Code Session Dashboard
 
-A desktop app to browse, search, and resume your [Claude Code](https://claude.ai/code) conversations.
+Browse, search, resume, and analyze your Claude Code sessions locally.
 
-Claude Code stores conversations as JSONL files in `~/.claude/projects/`, but finding old sessions is hard — especially across multiple projects and subdirectories. This tool indexes everything into a searchable SQLite database and provides a visual interface to browse and resume conversations.
+Claude Code stores session history as JSONL files in `~/.claude/projects/`. This app turns that local history into a searchable SQLite index and a desktop dashboard for finding conversations, reopening work, and understanding token usage, model usage, cost estimates, and activity over time.
 
-## Features
+- Claude Code only
+- Local-first
+- No cloud backend
+- No account
+- No telemetry upload
 
-- **Full-text search** across conversation titles, excerpts, and message content (SQLite FTS5)
-- **Auto-generated titles** from the first user prompt (handles plan titles, skill invocations, slash commands)
-- **Project tree sidebar** with collapsible folders and conversation counts
-- **Chat preview** with markdown rendering and syntax highlighting
-- **File browser panel** — browse your project files alongside conversations (lightweight VS Code alternative)
-- **Resume in terminal** — one click opens iTerm2, Terminal.app, or Warp with `claude -r <session-id>`
-- **Export** conversations as Markdown or JSON
-- **Resizable columns** — drag to resize all panels
-- **Auto-indexer** — launchd daemon re-indexes on file changes (macOS)
-- **Scroll to bottom** for long conversations
-- **Dark theme** with Claude-inspired colors
+## Why use it
 
-## Requirements
+- Find old Claude Code sessions fast
+- See the latest activity first
+- Preview transcripts before reopening them
+- Resume a session with `claude -r <session-id>`
+- Understand token usage, estimated cost, model mix, and active time
+- Keep everything on your machine
 
-- **macOS** (uses native webview and AppleScript for terminal integration)
-- **Python 3.10+**
-- **Claude Code** installed (`~/.claude/` directory must exist)
+## Screenshots
 
-## Install
+![Overview dashboard](./docs/screenshot-overview.png)
+![Session detail and transcript](./docs/screenshot-session-detail.png)
+
+## Quick start
+
+### Option 1: plug-and-play install
 
 ```bash
 git clone https://github.com/Vinix24/claude-conversation-manager.git
 cd claude-conversation-manager
 ./install.sh
+./run.sh
 ```
 
-This will:
-1. Create a Python virtual environment and install `pywebview`
-2. Index all your Claude Code conversations into SQLite
-3. Install a launchd daemon that auto-indexes every 30 minutes and on file changes
+`install.sh` will:
 
-## Usage
+1. Create a local virtual environment
+2. Install the app and its dependencies
+3. Build the initial SQLite index from `~/.claude/projects/`
+4. Create convenience commands in `~/.local/bin/`
+5. On macOS, install a `launchd` job that reindexes every 30 minutes and on file changes
+
+If `~/.claude/projects/` does not exist yet, install still succeeds. The app opens with an empty state and you can reindex later after Claude Code has created local session files.
+
+### Option 2: package-style install
+
+If you prefer an isolated tool install, this repo is also ready for:
 
 ```bash
-# Launch the app
+uv tool install .
+claude-session-dashboard-init
+claude-session-dashboard
+```
+
+or:
+
+```bash
+pipx install .
+claude-session-dashboard-init
+claude-session-dashboard
+```
+
+When this project is published to PyPI, the same commands will work without the trailing `.`.
+
+## What the app includes
+
+### Conversation manager
+
+- Search sessions across projects
+- Browse sessions in a folder tree
+- Sort by newest first or oldest first
+- Open a transcript preview with markdown rendering
+- Resume in Terminal, iTerm, Warp, or by copying the manual command
+- Export a session as Markdown or JSON
+
+### Usage dashboard
+
+- Total tokens
+- Estimated total cost
+- Total sessions
+- Active days
+- Unique active time and summed active time
+- Average active time per active day
+- Top models used
+- Daily tokens
+- Daily cost estimate
+- Daily active time
+- Model usage over time
+- Session size distribution
+- Weekday and hour usage patterns
+- Heaviest sessions table
+
+## Default data source
+
+By default the app reads Claude Code sessions from:
+
+```bash
+~/.claude/projects/
+```
+
+That matches the standard Claude Code location. You only need to change it if you intentionally store Claude Code data somewhere else.
+
+If the folder does not exist yet, the dashboard still launches. You will just see an empty state until Claude Code has written session history locally.
+
+## Running the app
+
+After installing:
+
+```bash
 ./run.sh
+```
 
-# Or add an alias to your .zshrc / .bashrc
-alias ccm='~/path/to/claude-conversation-manager/run.sh'
+If `~/.local/bin` is on your `PATH`, you can also run:
 
-# Re-index manually
-.venv/bin/python3 indexer.py
+```bash
+claude-session-dashboard
+```
 
-# Force re-index everything
-.venv/bin/python3 indexer.py --force
+Manual reindex:
+
+```bash
+claude-session-index
+```
+
+Force a full rebuild:
+
+```bash
+claude-session-index --force
 ```
 
 ## Configuration
 
-On first run, a config file is created at `~/.config/claude-conversation-manager/config.yaml`:
+Configuration is stored at:
+
+```bash
+~/.config/claude-session-dashboard/config.yaml
+```
+
+Example:
 
 ```yaml
-# Which project directories to index (filter by name).
-# Leave empty to index ALL projects in ~/.claude/projects/
+claude_projects_dir: ~/.claude/projects
 project_filters:
-
-# Subdirectory names to skip when indexing
 skip_subdirs: scheduled_jobs, subagents
-
-# Root directory for the file browser panel
 file_browser_root:
-
-# Preferred terminal: iterm, terminal, warp, auto
 terminal: auto
-
-# Window size
-window_width: 1400
-window_height: 900
+window_width: 1560
+window_height: 980
 ```
+
+Notes:
+
+- `claude_projects_dir`: override the default Claude Code sessions location
+- `project_filters`: optional folder-name filters if you only want a subset of projects indexed
+- `skip_subdirs`: folder names to ignore while scanning
+- `file_browser_root`: optional root for the built-in file browser panel
+- `terminal`: `auto`, `terminal`, `iterm`, `warp`, `vscode`, `system`, or `windows`
+
+Legacy config at `~/.config/claude-conversation-manager/config.yaml` is still read automatically if it already exists.
+
+## Estimated cost
+
+Estimated cost is clearly labeled as an estimate.
+
+- It is derived from recorded Claude model usage in your local session files
+- It uses published Claude API token pricing for recognized models
+- Unknown or synthetic model identifiers are excluded from the pricing estimate and tracked as uncovered tokens
+
+The dashboard shows pricing coverage so you can judge how complete the estimate is for your local history.
+
+## Usage metadata
+
+This app does not require a separate token or cost tracking package.
+
+- Claude Code session files already include usage metadata in current transcript formats
+- The dashboard reads that local metadata directly from the JSONL files
+- `/statusline` scripts can be useful for live terminal display, but they are not required for historical indexing or the dashboard
+
+## Privacy
+
+Runtime data stays out of the repo by default:
+
+- Indexed database lives in `~/.claude/conversation-index.db`
+- Config lives in `~/.config/claude-session-dashboard/config.yaml`
+- Shell shortcuts live in `~/.local/bin/`
+- macOS auto-indexer plist lives in `~/Library/LaunchAgents/`
+- Local repo-only artifacts like `.venv/` are gitignored
+
+This app reads your local Claude Code history. It does not upload it anywhere.
+
+## Requirements
+
+- Python 3.10+
+- Claude Code installed and in use
+- A populated `~/.claude/projects/` directory for full results
+- macOS for built-in `launchd` auto-indexing and native AppleScript terminal integration
+- Windows works for browsing and dashboard usage; resume-in-terminal uses Windows Terminal or PowerShell when available
+
+Linux browsing and dashboard usage work as well. Resume-in-terminal includes a Linux fallback for common terminal launchers, but the polished install path is still macOS-first today.
 
 ## Architecture
 
+```text
+~/.claude/projects/               Claude Code JSONL session files
+        |
+   indexer.py                     Parses JSONL -> SQLite
+        |
+~/.claude/conversation-index.db   Search + analytics database
+        |
+   app.py + pywebview             Desktop app
+        |
+   templates/index.html           Dashboard and conversation manager UI
 ```
-~/.claude/projects/          JSONL conversation files (source)
-        |
-   indexer.py                Parses JSONL → SQLite + FTS5
-        |
-~/.claude/conversation-index.db    Indexed database
-        |
-   app.py + pywebview        Desktop UI (HTML/CSS/JS)
-        |
-   terminal_opener.py        AppleScript → iTerm/Terminal/Warp
+
+Main modules:
+
+- `indexer.py`: indexing, schema migration, and usage metadata extraction
+- `claude_models.py`: model normalization and pricing estimates
+- `dashboard_data.py`: normalized dashboard and detail payloads
+- `app.py`: desktop API for the frontend
+- `templates/index.html`: single-file UI
+
+## Troubleshooting
+
+### I installed it but I see no sessions
+
+Make sure Claude Code has already written local transcripts to `~/.claude/projects/`. If needed, run:
+
+```bash
+claude-session-index --force
 ```
 
-### Database Schema
+### Do I need a separate token tracking package?
 
-- **conversations** — session metadata, auto-generated titles, excerpts, token counts
-- **messages** — individual messages with role, content, timestamps (RAG-ready with embedding column)
-- **conversations_fts** / **messages_fts** — FTS5 virtual tables for full-text search
+No. Current Claude Code transcript formats already include usage metadata in the JSONL files.
 
-## Keyboard Shortcuts
+### Can I resume manually without the UI buttons?
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+F` | Focus search bar |
-| `Escape` | Clear search |
+Yes:
 
-## How It Works
-
-1. **Indexer** scans all `~/.claude/projects/*/` directories for `.jsonl` files
-2. Each file is parsed to extract messages, timestamps, token usage, and working directory
-3. A title is auto-generated from the first meaningful user prompt
-4. Everything is stored in SQLite with FTS5 indexes for instant search
-5. The desktop app (pywebview) displays the data in a 3-panel layout
-6. Clicking "Resume" opens a new terminal tab with `claude -r <session-id>`
+```bash
+claude -r <session-id>
+```
 
 ## License
 

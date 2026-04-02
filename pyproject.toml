@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claude-session-dashboard"
+version = "0.1.0"
+description = "Local-first dashboard for browsing, searching, and understanding Claude Code sessions."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Vincent van Deth" }
+]
+dependencies = [
+  "pywebview>=5.0",
+  "PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Vinix24/claude-conversation-manager"
+Repository = "https://github.com/Vinix24/claude-conversation-manager"
+
+[project.scripts]
+claude-session-dashboard = "app:main"
+claude-session-index = "indexer:main"
+claude-session-dashboard-init = "init_cli:main"
+
+[tool.setuptools]
+include-package-data = true
+py-modules = [
+  "app",
+  "claude_models",
+  "config",
+  "dashboard_data",
+  "file_browser",
+  "init_cli",
+  "indexer",
+  "terminal_opener",
+]
+
+[tool.setuptools.data-files]
+"share/claude-session-dashboard/templates" = ["templates/index.html"]
