@@ -158,8 +158,19 @@ Notes:
 - `skip_subdirs`: folder names to ignore while scanning
 - `file_browser_root`: optional root for the built-in file browser panel
 - `terminal`: `auto`, `terminal`, `iterm`, `warp`, `vscode`, `system`, or `windows`
+- `custom_css_path`: optional custom CSS file to override branding colors and styles
 
 Legacy config at `~/.config/claude-conversation-manager/config.yaml` is still read automatically if it already exists.
+
+## Branding overrides
+
+Add a custom CSS file and point to it in config:
+
+```yaml
+custom_css_path: ~/.config/claude-session-dashboard/custom.css
+```
+
+That file is injected after the built-in styles, so your colors and typography override the defaults. The simplest way to rebrand is to override the CSS variables in the `:root` block.
 
 ## Estimated cost
 

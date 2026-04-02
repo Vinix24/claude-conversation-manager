@@ -29,6 +29,8 @@ DEFAULT_CONFIG = {
     "file_browser_root": "",
     # Preferred terminal: auto, terminal, iterm, warp, vscode, system, windows
     "terminal": "auto",
+    # Optional path to custom CSS file for branding overrides.
+    "custom_css_path": "",
     # Window dimensions
     "window_width": 1560,
     "window_height": 980,
@@ -154,6 +156,10 @@ file_browser_root:
 
 # Preferred terminal: auto, terminal, iterm, warp, vscode, system, windows
 terminal: auto
+
+# Optional path to custom CSS file for branding overrides.
+# Example: ~/.config/claude-session-dashboard/custom.css
+custom_css_path:
 
 # Window size
 window_width: 1560

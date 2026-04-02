@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from config import APP_NAME, DB_PATH, get_config, save_default_config
+from config import APP_NAME, CONFIG_DIR, DB_PATH, get_config, save_default_config
 from dashboard_data import get_dashboard_payload, get_session_detail
 from file_browser import get_directory_tree, read_file_content
 from indexer import init_db, run_index
@@ -344,7 +344,26 @@ def get_html():
         candidate = Path(sys.prefix) / "share" / "claude-session-dashboard" / "templates" / "index.html"
         if candidate.exists():
             template_path = candidate
-    return template_path.read_text(encoding="utf-8")
+    html = template_path.read_text(encoding="utf-8")
+    css_path = (get_config().get("custom_css_path") or "").strip()
+    if not css_path:
+        return html
+
+    path = Path(css_path).expanduser()
+    if not path.is_absolute():
+        path = (CONFIG_DIR / path).resolve()
+    if not path.exists():
+        return html
+
+    try:
+        css = path.read_text(encoding="utf-8")
+    except OSError:
+        return html
+
+    style_tag = f"\n<style>\n{css}\n</style>\n"
+    if "</head>" in html:
+        return html.replace("</head>", f"{style_tag}</head>", 1)
+    return html + style_tag
 
 
 def main():
