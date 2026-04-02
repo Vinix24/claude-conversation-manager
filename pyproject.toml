@@ -36,6 +36,7 @@ dependencies = [
 Homepage = "https://github.com/Vinix24/claude-conversation-manager"
 Repository = "https://github.com/Vinix24/claude-conversation-manager"
 Issues = "https://github.com/Vinix24/claude-conversation-manager/issues"
+Website = "https://vincentvandeth.nl"
 
 [project.scripts]
 claude-session-dashboard = "app:main"

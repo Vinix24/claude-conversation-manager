@@ -10,6 +10,10 @@ Claude Code stores session history as JSONL files in `~/.claude/projects/`. This
 - No account
 - No telemetry upload
 
+## Website
+
+https://vincentvandeth.nl
+
 ## Why use it
 
 - Find old Claude Code sessions fast
