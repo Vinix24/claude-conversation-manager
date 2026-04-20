@@ -28,6 +28,7 @@ class ModelPricing:
 
 
 MODEL_PRICING: dict[str, ModelPricing] = {
+    "claude-opus-4-7": ModelPricing("Claude Opus 4.7", 5.0, 6.25, 10.0, 0.50, 25.0),
     "claude-opus-4-6": ModelPricing("Claude Opus 4.6", 5.0, 6.25, 10.0, 0.50, 25.0),
     "claude-opus-4-5": ModelPricing("Claude Opus 4.5", 5.0, 6.25, 10.0, 0.50, 25.0),
     "claude-opus-4-1": ModelPricing("Claude Opus 4.1", 15.0, 18.75, 30.0, 1.50, 75.0),
@@ -42,6 +43,7 @@ MODEL_PRICING: dict[str, ModelPricing] = {
 }
 
 MODEL_ALIASES = {
+    "claude-opus-4-7-latest": "claude-opus-4-7",
     "claude-opus-4-1-latest": "claude-opus-4-1",
     "claude-sonnet-4-5-latest": "claude-sonnet-4-5",
     "claude-sonnet-4-6-latest": "claude-sonnet-4-6",
