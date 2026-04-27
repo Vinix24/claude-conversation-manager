@@ -149,6 +149,62 @@ select {
   background: rgba(6, 24, 69, 0.8);
 }
 
+.search-status {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 4px;
+  right: 4px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: rgba(6, 24, 69, 0.9);
+  border: 1px solid rgba(229, 246, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 10px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.search-status.hidden {
+  display: none;
+}
+
+.search-status.error {
+  color: #ffd6cc;
+  border-color: rgba(244, 114, 91, 0.45);
+  background: rgba(118, 33, 22, 0.7);
+}
+
+.conversation-snippet {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  background: rgba(249, 115, 22, 0.06);
+  border-left: 2px solid rgba(249, 115, 22, 0.5);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin: 6px 0 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.conversation-snippet mark {
+  background: rgba(249, 115, 22, 0.35);
+  color: #fff8f0;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.conversation-match-kind {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(249, 115, 22, 0.85);
+  margin-left: 6px;
+}
+
 .toolbar-select,
 .toolbar-btn {
   border: 1px solid rgba(229, 246, 255, 0.14);
@@ -1254,10 +1310,12 @@ tbody tr:hover {
         <circle cx="11" cy="11" r="7"></circle>
         <path d="m20 20-3.5-3.5"></path>
       </svg>
-      <input class="search-input" id="searchInput" placeholder="Search titles, prompts, and message text">
+      <input class="search-input" id="searchInput" placeholder='Search — try "exact phrase", -exclude, or word*'>
+      <div class="search-status hidden" id="searchStatus"></div>
     </div>
 
     <select class="toolbar-select" id="sortSelect">
+      <option value="relevance">Best match</option>
       <option value="newest">Newest first</option>
       <option value="oldest">Oldest first</option>
       <option value="tokens">Most tokens</option>
@@ -1358,6 +1416,7 @@ const state = {
   selectedConversationId: null,
   selectedConversationDetail: null,
   searchQuery: '',
+  searchMeta: null,
   sort: 'newest',
   fileTree: null,
   filePanelOpen: false,
@@ -1378,6 +1437,19 @@ function escHtml(value) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+const SNIPPET_MARK_OPEN = 'MARK_OPEN';
+const SNIPPET_MARK_CLOSE = 'MARK_CLOSE';
+
+function sanitiseSnippetHtml(value) {
+  if (!value) return '';
+  const placeheld = String(value)
+    .replaceAll('<mark>', SNIPPET_MARK_OPEN)
+    .replaceAll('</mark>', SNIPPET_MARK_CLOSE);
+  return escHtml(placeheld)
+    .replaceAll(SNIPPET_MARK_OPEN, '<mark>')
+    .replaceAll(SNIPPET_MARK_CLOSE, '</mark>');
 }
 
 function formatDate(value) {
@@ -1448,7 +1520,7 @@ function loadUiState() {
     const saved = JSON.parse(raw);
     if (saved.sort === 'date') {
       state.sort = 'newest';
-    } else if (['newest', 'oldest', 'tokens', 'cost', 'messages', 'title'].includes(saved.sort)) {
+    } else if (['relevance', 'newest', 'oldest', 'tokens', 'cost', 'messages', 'title'].includes(saved.sort)) {
       state.sort = saved.sort;
     }
     if (['7d', '30d', '90d', 'month'].includes(saved.dashboardRange)) {
@@ -1637,7 +1709,7 @@ async function loadProjects() {
 }
 
 async function loadConversations() {
-  const conversations = await callApi(
+  const result = await callApi(
     'get_conversations',
     state.selectedProject,
     state.searchQuery || null,
@@ -1645,8 +1717,39 @@ async function loadConversations() {
     250,
     0
   );
-  state.conversations = Array.isArray(conversations) ? conversations : [];
+
+  let conversations = [];
+  let searchMeta = null;
+  if (Array.isArray(result)) {
+    conversations = result;
+  } else if (result && typeof result === 'object') {
+    conversations = Array.isArray(result.conversations) ? result.conversations : [];
+    searchMeta = result.search || null;
+  }
+  state.conversations = conversations;
+  state.searchMeta = searchMeta;
+  renderSearchStatus();
   renderConversationList();
+}
+
+function renderSearchStatus() {
+  const banner = document.getElementById('searchStatus');
+  if (!banner) return;
+  const meta = state.searchMeta;
+  if (!meta || !meta.active) {
+    banner.classList.add('hidden');
+    banner.textContent = '';
+    return;
+  }
+  banner.classList.remove('hidden');
+  if (meta.error) {
+    banner.classList.add('error');
+    banner.textContent = meta.error;
+    return;
+  }
+  banner.classList.remove('error');
+  const matches = typeof meta.matches === 'number' ? meta.matches : state.conversations.length;
+  banner.textContent = `${matches.toLocaleString()} matching session${matches === 1 ? '' : 's'} (sort: ${state.sort})`;
 }
 
 async function loadDashboard() {
@@ -1792,6 +1895,13 @@ function renderConversationList() {
     const activityDate = state.sort === 'oldest'
       ? (conversation.created_at || conversation.first_message)
       : (conversation.last_message_at || conversation.last_message);
+    const snippetHtml = sanitiseSnippetHtml(conversation.snippet_html);
+    const matchKindLabel = conversation.match_kind
+      ? `<span class="conversation-match-kind">${escHtml(conversation.match_kind)}</span>`
+      : '';
+    const snippetBlock = snippetHtml
+      ? `<div class="conversation-snippet">${snippetHtml}${matchKindLabel}</div>`
+      : '';
     return `
       <article class="conversation-card ${active}" data-session="${escHtml(conversation.session_id)}">
         <div class="conversation-topline">
@@ -1802,6 +1912,7 @@ function renderConversationList() {
           <div class="conversation-date">${escHtml(formatDate(activityDate))}</div>
         </div>
 
+        ${snippetBlock}
         <div class="conversation-preview-label">${escHtml(previewLabel)}</div>
         <div class="conversation-excerpt">${escHtml(previewText)}</div>
 

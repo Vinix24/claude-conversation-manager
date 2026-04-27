@@ -104,7 +104,48 @@ class ConversationAPI:
         conn.close()
         return [dict(row) for row in rows]
 
-    def get_conversations(self, project_path=None, search=None, sort="newest", limit=200, offset=0):
+    def _build_fts_query(self, raw: str) -> str:
+        """Convert user input into a safe FTS5 MATCH expression.
+
+        Multi-word input becomes implicit-AND with prefix matching on each
+        token. Power users can use FTS5 syntax (quoted phrases, NEAR, NOT,
+        column filters) by including ``"`` or ``:`` in the query.
+        """
+        text = raw.strip()
+        if not text:
+            return ""
+        if any(c in text for c in '":^'):
+            return text
+        tokens = re.findall(r"\S+", text)
+        parts: list[str] = []
+        for token in tokens:
+            upper = token.upper()
+            if upper in {"AND", "OR", "NOT"}:
+                parts.append(upper)
+                continue
+            if token.startswith(("+", "-")):
+                head, tail = token[0], token[1:]
+                cleaned = re.sub(r"[^\wÀ-￿*]", "", tail)
+                if cleaned:
+                    parts.append(f"{head}{cleaned}*" if not cleaned.endswith("*") else f"{head}{cleaned}")
+                continue
+            cleaned = re.sub(r"[^\wÀ-￿*]", "", token)
+            if not cleaned:
+                continue
+            if cleaned.endswith("*"):
+                parts.append(cleaned)
+            else:
+                parts.append(f"{cleaned}*")
+        return " ".join(parts)
+
+    def get_conversations(
+        self,
+        project_path=None,
+        search=None,
+        sort="newest",
+        limit=200,
+        offset=0,
+    ):
         conn = self._get_conn()
         params: list = []
 
@@ -148,21 +189,106 @@ class ConversationAPI:
             c.cwd AS working_directory
         """
 
+        search_meta: dict = {"active": False, "error": None, "fts_query": None}
+        snippet_map: dict[str, dict] = {}
+
         if search:
-            fts_term = search.strip()
-            fts_query = fts_term + "*" if not any(char in fts_term for char in ' "+-') else fts_term
+            fts_query = self._build_fts_query(search)
+            search_meta.update({"active": True, "fts_query": fts_query})
 
-            params = [fts_query, fts_query]
+            if not fts_query:
+                conn.close()
+                return {
+                    "conversations": [],
+                    "search": {**search_meta, "error": "Empty query after sanitisation."},
+                }
+
+            try:
+                title_rows = conn.execute(
+                    """
+                    SELECT session_id,
+                           bm25(conversations_fts, 0.0, 5.0, 3.0) AS title_score,
+                           snippet(conversations_fts, 1, '<mark>', '</mark>', '…', 12) AS title_snippet,
+                           snippet(conversations_fts, 2, '<mark>', '</mark>', '…', 18) AS excerpt_snippet
+                    FROM conversations_fts
+                    WHERE conversations_fts MATCH ?
+                    """,
+                    [fts_query],
+                ).fetchall()
+
+                msg_raw = conn.execute(
+                    """
+                    SELECT session_id,
+                           rank AS msg_score,
+                           snippet(messages_fts, 1, '<mark>', '</mark>', '…', 18) AS snippet
+                    FROM messages_fts
+                    WHERE messages_fts MATCH ?
+                    ORDER BY rank
+                    LIMIT 5000
+                    """,
+                    [fts_query],
+                ).fetchall()
+            except sqlite3.OperationalError as exc:
+                conn.close()
+                return {
+                    "conversations": [],
+                    "search": {
+                        **search_meta,
+                        "error": f"Invalid search syntax: {exc}",
+                    },
+                }
+            except sqlite3.Error as exc:
+                conn.close()
+                return {
+                    "conversations": [],
+                    "search": {**search_meta, "error": f"Search failed: {exc}"},
+                }
+
+            TITLE_BOOST = 200.0
+            for row in title_rows:
+                sid = row["session_id"]
+                snippet = row["title_snippet"] or row["excerpt_snippet"]
+                snippet_map[sid] = {
+                    "score": (row["title_score"] or 0.0) - TITLE_BOOST,
+                    "snippet": snippet,
+                    "match_kind": "title",
+                }
+
+            msg_per_session: dict[str, sqlite3.Row] = {}
+            for row in msg_raw:
+                sid = row["session_id"]
+                if sid not in msg_per_session:
+                    msg_per_session[sid] = row
+
+            for sid, row in msg_per_session.items():
+                msg_score = row["msg_score"] or 0.0
+                if sid in snippet_map:
+                    snippet_map[sid]["score"] += msg_score
+                    if not snippet_map[sid].get("snippet"):
+                        snippet_map[sid]["snippet"] = row["snippet"]
+                    snippet_map[sid]["match_kind"] = "title+message"
+                else:
+                    snippet_map[sid] = {
+                        "score": msg_score,
+                        "snippet": row["snippet"],
+                        "match_kind": "message",
+                    }
+
+            if not snippet_map:
+                conn.close()
+                return {
+                    "conversations": [],
+                    "search": {**search_meta, "error": None, "matches": 0},
+                }
+
+            session_ids = list(snippet_map.keys())
+            placeholders = ",".join("?" for _ in session_ids)
+            params = list(session_ids)
             project_filter = self._project_scope_clause("c", project_path, params)
-
             query = f"""
-                SELECT DISTINCT {select_fields}
+                SELECT {select_fields}
                 FROM conversations c
-                WHERE c.session_id IN (
-                    SELECT session_id FROM conversations_fts WHERE conversations_fts MATCH ?
-                    UNION
-                    SELECT session_id FROM messages_fts WHERE messages_fts MATCH ?
-                ){project_filter}
+                WHERE c.session_id IN ({placeholders}){project_filter}
             """
         else:
             query = f"""
@@ -181,16 +307,39 @@ class ConversationAPI:
             "cost": "c.estimated_cost_usd DESC, COALESCE(c.last_message, c.first_message) DESC",
             "title": "LOWER(c.title) ASC, COALESCE(c.last_message, c.first_message) DESC",
         }
-        query += f" ORDER BY {sort_map.get(sort, sort_map['newest'])}"
-        query += " LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
+        if sort != "relevance" or not search_meta["active"]:
+            query += f" ORDER BY {sort_map.get(sort, sort_map['newest'])}"
+            query += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
 
         try:
             rows = conn.execute(query, params).fetchall()
-        except sqlite3.Error:
-            rows = []
+        except sqlite3.Error as exc:
+            conn.close()
+            return {
+                "conversations": [],
+                "search": {**search_meta, "error": f"Query failed: {exc}"},
+            }
         conn.close()
-        return [self._serialize_conversation_row(row) for row in rows]
+
+        serialised = [self._serialize_conversation_row(row) for row in rows]
+
+        if search_meta["active"]:
+            for item in serialised:
+                meta = snippet_map.get(item.get("session_id"))
+                if meta:
+                    item["snippet_html"] = meta.get("snippet")
+                    item["search_score"] = meta.get("score")
+                    item["match_kind"] = meta.get("match_kind")
+            if sort == "relevance":
+                serialised.sort(key=lambda it: it.get("search_score") or 0.0)
+                serialised = serialised[offset : offset + limit]
+            search_meta["matches"] = len(snippet_map)
+
+        return {
+            "conversations": serialised,
+            "search": search_meta,
+        }
 
     def get_conversation_messages(self, session_id):
         conn = self._get_conn()
