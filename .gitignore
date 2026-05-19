@@ -9,3 +9,9 @@ dist/
 *.db-shm
 .DS_Store
 /tmp/
+
+# Syncthing conflict copies (created when the same file changes on two machines).
+*.sync-conflict-*
+
+# Local scratch logs (e.g. excalidraw.log from the MCP server).
+*.log
