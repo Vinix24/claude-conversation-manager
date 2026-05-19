@@ -23,6 +23,26 @@ from indexer import init_db, run_index
 from terminal_opener import open_session
 
 
+_FTS_OPERATOR_CHARS = '"+-'
+
+
+def build_fts_query(search: str) -> str:
+    """Translate a user search string into an FTS5 MATCH expression.
+
+    When the input contains FTS5 operator characters (quotes, +, -) the term is
+    passed through unchanged so power-users keep full control. Otherwise each
+    whitespace-separated word gets an auto-prefix `*` so multi-word searches
+    still benefit from prefix matching (e.g. `renier opg` -> `renier* opg*`).
+    """
+    term = search.strip()
+    if any(char in term for char in _FTS_OPERATOR_CHARS):
+        return term
+    words = term.split()
+    if not words:
+        return term
+    return " ".join(word + "*" for word in words)
+
+
 class ConversationAPI:
     """Python API exposed to the webview frontend."""
 
@@ -149,8 +169,7 @@ class ConversationAPI:
         """
 
         if search:
-            fts_term = search.strip()
-            fts_query = fts_term + "*" if not any(char in fts_term for char in ' "+-') else fts_term
+            fts_query = build_fts_query(search)
 
             params = [fts_query, fts_query]
             project_filter = self._project_scope_clause("c", project_path, params)
