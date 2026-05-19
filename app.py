@@ -43,6 +43,50 @@ def build_fts_query(search: str) -> str:
     return " ".join(word + "*" for word in words)
 
 
+DAYS_ACTIVE_VALUES = (1, 7, 30, 90)
+
+
+def normalize_days_active(value) -> int | None:
+    """Return an allowed day-window int, or None for the 'all time' view.
+
+    Accepts ints, numeric strings, and the sentinel string `'all'`. Anything
+    outside the whitelist falls back to `None` so untrusted UI input cannot
+    inject arbitrary SQL via the day count.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip().lower()
+        if stripped in ("", "all"):
+            return None
+        try:
+            value = int(stripped)
+        except ValueError:
+            return None
+    try:
+        days = int(value)
+    except (TypeError, ValueError):
+        return None
+    return days if days in DAYS_ACTIVE_VALUES else None
+
+
+def build_days_active_clause(alias: str, days_active) -> tuple[str, list]:
+    """Build the `AND last_message >= datetime('now', '-N days')` fragment.
+
+    Returns an empty fragment + no params when no window is selected.
+    The day-count is whitelisted, so the `-N days` modifier is safe to inline.
+    """
+    days = normalize_days_active(days_active)
+    if days is None:
+        return "", []
+    modifier = f"-{days} days"
+    fragment = (
+        f" AND COALESCE({alias}.last_message, {alias}.first_message)"
+        " >= datetime('now', ?)"
+    )
+    return fragment, [modifier]
+
+
 class ConversationAPI:
     """Python API exposed to the webview frontend."""
 
@@ -124,7 +168,7 @@ class ConversationAPI:
         conn.close()
         return [dict(row) for row in rows]
 
-    def get_conversations(self, project_path=None, search=None, sort="newest", limit=200, offset=0):
+    def get_conversations(self, project_path=None, search=None, sort="newest", days_active=None, limit=200, offset=0):
         conn = self._get_conn()
         params: list = []
 
@@ -168,6 +212,8 @@ class ConversationAPI:
             c.cwd AS working_directory
         """
 
+        days_fragment, days_params = build_days_active_clause("c", days_active)
+
         if search:
             fts_query = build_fts_query(search)
 
@@ -181,8 +227,9 @@ class ConversationAPI:
                     SELECT session_id FROM conversations_fts WHERE conversations_fts MATCH ?
                     UNION
                     SELECT session_id FROM messages_fts WHERE messages_fts MATCH ?
-                ){project_filter}
+                ){project_filter}{days_fragment}
             """
+            params.extend(days_params)
         else:
             query = f"""
                 SELECT {select_fields}
@@ -190,6 +237,8 @@ class ConversationAPI:
                 WHERE 1=1
             """
             query += self._project_scope_clause("c", project_path, params)
+            query += days_fragment
+            params.extend(days_params)
 
         sort_map = {
             "date": "COALESCE(c.last_message, c.first_message) DESC, c.first_message DESC, c.session_id DESC",
