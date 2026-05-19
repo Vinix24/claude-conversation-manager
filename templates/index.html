@@ -1266,6 +1266,14 @@ tbody tr:hover {
       <option value="title">Title A-Z</option>
     </select>
 
+    <select class="toolbar-select" id="daysActiveSelect" title="Limit to sessions active in the last N days">
+      <option value="1">Last 1 day</option>
+      <option value="7">Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="all">All time</option>
+    </select>
+
     <button class="toolbar-btn primary active" id="overviewBtn">Overview</button>
     <button class="toolbar-btn" id="filesBtn">Files</button>
     <button class="toolbar-btn" id="reindexBtn">Reindex</button>
@@ -1359,6 +1367,7 @@ const state = {
   selectedConversationDetail: null,
   searchQuery: '',
   sort: 'newest',
+  daysActive: 30,
   fileTree: null,
   filePanelOpen: false,
   selectedFilePath: null,
@@ -1451,6 +1460,9 @@ function loadUiState() {
     } else if (['newest', 'oldest', 'tokens', 'cost', 'messages', 'title'].includes(saved.sort)) {
       state.sort = saved.sort;
     }
+    if ([1, 7, 30, 90].includes(saved.daysActive) || saved.daysActive === 'all') {
+      state.daysActive = saved.daysActive;
+    }
     if (['7d', '30d', '90d', 'month'].includes(saved.dashboardRange)) {
       state.dashboardRange = saved.dashboardRange;
     }
@@ -1475,6 +1487,7 @@ function persistUiState() {
   try {
     window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify({
       sort: state.sort,
+      daysActive: state.daysActive,
       dashboardRange: state.dashboardRange,
       dashboardMonth: state.dashboardMonth,
       selectedProject: state.selectedProject,
@@ -1575,6 +1588,7 @@ async function init() {
   bindEvents();
   bindResizeHandles();
   document.getElementById('sortSelect').value = state.sort;
+  document.getElementById('daysActiveSelect').value = String(state.daysActive);
   await Promise.all([
     loadProjects(),
     loadConversations(),
@@ -1611,6 +1625,13 @@ function bindEvents() {
     await loadConversations();
   });
 
+  document.getElementById('daysActiveSelect').addEventListener('change', async (event) => {
+    const raw = event.target.value;
+    state.daysActive = raw === 'all' ? 'all' : Number.parseInt(raw, 10);
+    persistUiState();
+    await loadConversations();
+  });
+
   document.addEventListener('keydown', (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
       event.preventDefault();
@@ -1637,11 +1658,13 @@ async function loadProjects() {
 }
 
 async function loadConversations() {
+  const daysActive = state.daysActive === 'all' ? null : state.daysActive;
   const conversations = await callApi(
     'get_conversations',
     state.selectedProject,
     state.searchQuery || null,
     state.sort,
+    daysActive,
     250,
     0
   );
