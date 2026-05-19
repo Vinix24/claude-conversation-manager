@@ -34,6 +34,20 @@ DEFAULT_CONFIG = {
     # Window dimensions
     "window_width": 1560,
     "window_height": 980,
+    # Headless-session detection thresholds. A session that triggers >= threshold
+    # signals (low turn count, dispatch-like first prompt, worktree-style cwd,
+    # very short duration) is marked as headless and hidden by default.
+    "headless_max_turns": 4,
+    "headless_max_duration_seconds": 60,
+    "headless_score_threshold": 2,
+    "headless_dispatch_patterns": [
+        "# Dispatch:",
+        "## Critical rules",
+        "dispatch_id",
+        "Task ID:",
+        "VNX_DISPATCH",
+    ],
+    "headless_cwd_patterns": ["-wt-", "/worktree/", "/.claude/terminals/"],
 }
 
 
@@ -164,6 +178,17 @@ custom_css_path:
 # Window size
 window_width: 1560
 window_height: 980
+
+# Headless-session detection. Sessions started by `claude -p` (VNX workers,
+# automation scripts, CI dispatches) tend to be short, run in worktree
+# directories, and start with a dispatch-style prompt. The indexer scores
+# each session against these signals and the UI hides anything scoring
+# >= headless_score_threshold by default.
+headless_max_turns: 4
+headless_max_duration_seconds: 60
+headless_score_threshold: 2
+headless_dispatch_patterns: # Dispatch:, ## Critical rules, dispatch_id, Task ID:, VNX_DISPATCH
+headless_cwd_patterns: -wt-, /worktree/, /.claude/terminals/
 """)
 
 

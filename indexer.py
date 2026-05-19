@@ -16,8 +16,12 @@ from pathlib import Path
 
 from claude_models import estimate_message_cost_usd, normalize_model_name, summarize_models
 from config import DB_PATH, get_config, get_projects_dir
+from headless import SESSION_TYPE_UNKNOWN, score_from_config
 
-CURRENT_SCHEMA_VERSION = 2
+# Bump when the parsed/derived columns change so a reindex re-evaluates every
+# session. Bumped to 3 with the headless-detection columns; the version gate in
+# `index_conversation()` doubles as the one-time backfill mechanism.
+CURRENT_SCHEMA_VERSION = 3
 
 
 def get_project_dirs():
@@ -258,7 +262,7 @@ def parse_jsonl_file(filepath: str) -> dict | None:
     excerpt = "\n---\n".join(excerpt_parts)
     model_summary = summarize_models(dict(model_totals))
 
-    return {
+    parsed = {
         "session_id": session_id,
         "slug": slug or "",
         "title": title,
@@ -278,8 +282,16 @@ def parse_jsonl_file(filepath: str) -> dict | None:
         "cwd": cwd or "",
         "version": version or "",
         **model_summary,
+        "first_prompt": first_prompt,
         "messages": messages,
     }
+
+    headless = score_from_config(parsed, get_config())
+    parsed["session_type"] = headless["session_type"]
+    parsed["session_type_score"] = headless["score"]
+    parsed["session_type_signals"] = ",".join(headless["signals"])
+
+    return parsed
 
 
 def init_db(db_path: str) -> sqlite3.Connection:
@@ -393,6 +405,9 @@ def init_db(db_path: str) -> sqlite3.Connection:
             "model_display": "TEXT",
             "models_json": "TEXT",
             "schema_version": "INTEGER DEFAULT 1",
+            "session_type": f"TEXT DEFAULT '{SESSION_TYPE_UNKNOWN}'",
+            "session_type_score": "INTEGER DEFAULT 0",
+            "session_type_signals": "TEXT DEFAULT ''",
         },
     )
     _ensure_columns(
@@ -410,6 +425,7 @@ def init_db(db_path: str) -> sqlite3.Connection:
     conn.executescript("""
         CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
         CREATE INDEX IF NOT EXISTS idx_messages_model ON messages(model);
+        CREATE INDEX IF NOT EXISTS idx_conversations_type ON conversations(session_type);
     """)
 
     conn.commit()
@@ -454,8 +470,10 @@ def index_conversation(conn: sqlite3.Connection, fallback_project_path: str, fil
             total_tokens, input_tokens, output_tokens, cache_creation_input_tokens,
             cache_read_input_tokens, estimated_cost_usd, priced_tokens, unpriced_tokens,
             cwd, version, primary_model, model_count, model_display, models_json,
-            file_path, file_mtime, schema_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            file_path, file_mtime, schema_version,
+            session_type, session_type_score, session_type_signals)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?)
     """, (
         session_id, project_path, data["slug"], data["title"], data["excerpt"],
         data["first_message"], data["last_message"], data["message_count"],
@@ -466,6 +484,7 @@ def index_conversation(conn: sqlite3.Connection, fallback_project_path: str, fil
         data["version"], data["primary_model"], data["model_count"],
         data["model_display"], data["models_json"], filepath, file_mtime,
         CURRENT_SCHEMA_VERSION,
+        data["session_type"], data["session_type_score"], data["session_type_signals"],
     ))
 
     msg_rows = [

@@ -1266,6 +1266,8 @@ tbody tr:hover {
       <option value="title">Title A-Z</option>
     </select>
 
+    <button class="toolbar-btn active" id="hideHeadlessBtn" title="Hide sessions started by `claude -p` (subprocess dispatches, workers, automation)">Hide headless</button>
+
     <button class="toolbar-btn primary active" id="overviewBtn">Overview</button>
     <button class="toolbar-btn" id="filesBtn">Files</button>
     <button class="toolbar-btn" id="reindexBtn">Reindex</button>
@@ -1359,6 +1361,7 @@ const state = {
   selectedConversationDetail: null,
   searchQuery: '',
   sort: 'newest',
+  hideHeadless: true,
   fileTree: null,
   filePanelOpen: false,
   selectedFilePath: null,
@@ -1451,6 +1454,9 @@ function loadUiState() {
     } else if (['newest', 'oldest', 'tokens', 'cost', 'messages', 'title'].includes(saved.sort)) {
       state.sort = saved.sort;
     }
+    if (typeof saved.hideHeadless === 'boolean') {
+      state.hideHeadless = saved.hideHeadless;
+    }
     if (['7d', '30d', '90d', 'month'].includes(saved.dashboardRange)) {
       state.dashboardRange = saved.dashboardRange;
     }
@@ -1475,6 +1481,7 @@ function persistUiState() {
   try {
     window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify({
       sort: state.sort,
+      hideHeadless: state.hideHeadless,
       dashboardRange: state.dashboardRange,
       dashboardMonth: state.dashboardMonth,
       selectedProject: state.selectedProject,
@@ -1575,6 +1582,7 @@ async function init() {
   bindEvents();
   bindResizeHandles();
   document.getElementById('sortSelect').value = state.sort;
+  document.getElementById('hideHeadlessBtn').classList.toggle('active', state.hideHeadless);
   await Promise.all([
     loadProjects(),
     loadConversations(),
@@ -1611,6 +1619,13 @@ function bindEvents() {
     await loadConversations();
   });
 
+  document.getElementById('hideHeadlessBtn').addEventListener('click', async () => {
+    state.hideHeadless = !state.hideHeadless;
+    document.getElementById('hideHeadlessBtn').classList.toggle('active', state.hideHeadless);
+    persistUiState();
+    await loadConversations();
+  });
+
   document.addEventListener('keydown', (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
       event.preventDefault();
@@ -1642,6 +1657,7 @@ async function loadConversations() {
     state.selectedProject,
     state.searchQuery || null,
     state.sort,
+    !state.hideHeadless,
     250,
     0
   );

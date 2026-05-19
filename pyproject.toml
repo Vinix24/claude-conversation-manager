@@ -51,6 +51,7 @@ py-modules = [
   "config",
   "dashboard_data",
   "file_browser",
+  "headless",
   "init_cli",
   "indexer",
   "terminal_opener",

@@ -72,6 +72,7 @@ If `~/.claude/projects/` does not exist yet, install still succeeds. The app ope
 - Search sessions across projects
 - Browse sessions in a folder tree
 - Sort by newest first or oldest first
+- Hide headless `claude -p` dispatches by default (workers, automation, CI)
 - Open a transcript preview with markdown rendering
 - Resume in Terminal, iTerm, Warp, or by copying the manual command
 - Export a session as Markdown or JSON

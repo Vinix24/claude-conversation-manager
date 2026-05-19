@@ -86,6 +86,16 @@ class ConversationAPI:
         params.extend([project_path, f"{project_path}/%"])
         return f" AND ({alias}.project_path = ? OR {alias}.project_path LIKE ?)"
 
+    def _headless_clause(self, alias: str, include_headless: bool) -> str:
+        """Hide sessions tagged as headless unless the caller opts in.
+
+        `unknown` rows (legacy data that predates the headless-detection schema)
+        always pass through so they don't silently disappear after an upgrade.
+        """
+        if include_headless:
+            return ""
+        return f" AND COALESCE({alias}.session_type, 'unknown') != 'headless'"
+
     def get_projects(self):
         conn = self._get_conn()
         rows = conn.execute(
@@ -104,7 +114,7 @@ class ConversationAPI:
         conn.close()
         return [dict(row) for row in rows]
 
-    def get_conversations(self, project_path=None, search=None, sort="newest", limit=200, offset=0):
+    def get_conversations(self, project_path=None, search=None, sort="newest", include_headless=False, limit=200, offset=0):
         conn = self._get_conn()
         params: list = []
 
@@ -148,6 +158,8 @@ class ConversationAPI:
             c.cwd AS working_directory
         """
 
+        headless_clause = self._headless_clause("c", include_headless)
+
         if search:
             fts_term = search.strip()
             fts_query = fts_term + "*" if not any(char in fts_term for char in ' "+-') else fts_term
@@ -162,7 +174,7 @@ class ConversationAPI:
                     SELECT session_id FROM conversations_fts WHERE conversations_fts MATCH ?
                     UNION
                     SELECT session_id FROM messages_fts WHERE messages_fts MATCH ?
-                ){project_filter}
+                ){project_filter}{headless_clause}
             """
         else:
             query = f"""
@@ -171,6 +183,7 @@ class ConversationAPI:
                 WHERE 1=1
             """
             query += self._project_scope_clause("c", project_path, params)
+            query += headless_clause
 
         sort_map = {
             "date": "COALESCE(c.last_message, c.first_message) DESC, c.first_message DESC, c.session_id DESC",
